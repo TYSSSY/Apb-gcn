@@ -66,7 +66,7 @@ def gendata(data_path,
         '{}/{}_data.npy'.format(out_path, part),
         dtype='float32',
         mode='w+',
-        shape=(len(sample_label), 3, max_frame, num_joint, max_body))
+        shape=(len(sample_label), 7, max_frame, num_joint, max_body))
 
     for i in tqdm(range(len(sample_name))):
         s = sample_name[i]
