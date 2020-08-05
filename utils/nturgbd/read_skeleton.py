@@ -1,4 +1,5 @@
 import numpy as np
+import math
 import os
 
 def read_skeleton(file):
@@ -41,12 +42,25 @@ def read_skeleton(file):
 
 def read_xyz(file, max_body=2, num_joint=25):
     seq_info = read_skeleton(file)
-    data = np.zeros((3, seq_info['numFrame'], num_joint, max_body))
+    data = np.zeros((7, seq_info['numFrame'], num_joint, max_body))
+    print(seq_info['frameInfo'])
     for n, f in enumerate(seq_info['frameInfo']):
         for m, b in enumerate(f['bodyInfo']):
             for j, v in enumerate(b['jointInfo']):
                 if m < max_body and j < num_joint:
-                    data[:, n, j, m] = [v['x'], v['y'], v['z']]
+                    data[:3, n, j, m] = [v['x'], v['y'], v['z']]
+                    if n > 0:
+                        motionVector = data[:, n-1, j, m] - data[:, n, j, m]
+                        x = motionVector[0]
+                        y = motionVector[1]
+                        z = motionVector[2]
+                        magnitude = math.sqrt(x**2 + y**2 + z**2)
+
+                        xyAngle = math.acos(z/magnitude)
+                        yzAngle = math.acos(x/magnitude)
+                        xzAngle = math.acos(y/magnitude)
+                        data[3:, n - 1, j, m] = [xyAngle, yzAngle, xzAngle, magnitude]
+
                 else:
                     pass
     return data
