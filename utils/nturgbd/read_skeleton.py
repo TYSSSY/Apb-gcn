@@ -42,7 +42,6 @@ def read_skeleton(file):
 def read_xyz(file, max_body=2, num_joint=25):
     seq_info = read_skeleton(file)
     data = np.zeros((7, seq_info['numFrame'], num_joint, max_body))
-    print(seq_info['frameInfo'])
     for n, f in enumerate(seq_info['frameInfo']):
         for m, b in enumerate(f['bodyInfo']):
             for j, v in enumerate(b['jointInfo']):
@@ -55,9 +54,14 @@ def read_xyz(file, max_body=2, num_joint=25):
                         z = motionVector[2]
                         magnitude = math.sqrt(x ** 2 + y ** 2 + z ** 2)
 
-                        xyAngle = math.acos(z / magnitude)
-                        yzAngle = math.acos(x / magnitude)
-                        xzAngle = math.acos(y / magnitude)
+                        if magnitude > 0:
+                            xyAngle = math.acos(z / magnitude)
+                            yzAngle = math.acos(x / magnitude)
+                            xzAngle = math.acos(y / magnitude)
+                        if magnitude == 0:
+                            xyAngle = 0
+                            yzAngle = 0
+                            xzAngle = 0
                         data[3:, n - 1, j, m] = [xyAngle, yzAngle, xzAngle, magnitude]
 
                 else:
