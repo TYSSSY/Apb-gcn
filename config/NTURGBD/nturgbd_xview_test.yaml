@@ -18,7 +18,7 @@ model_args:
   layers_config: [[64, 64, 1], [64, 64, 1], [64, 64, 1], [64, 128, 2], [128, 128, 1], 
       [128, 128, 1], [128, 256, 2], [256, 256, 1], [256, 256, 1]]
   num_class: 60
-  channel: 15
+  channel: 35
   window_size: 300
   num_joints: 25
   num_actors: 2
