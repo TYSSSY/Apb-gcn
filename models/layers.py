@@ -19,9 +19,18 @@ def clones(module, k):
     )
 
 
-class GAPConv(MessagePassing):
+def add_self_loop(x_l, x_r, size, adj):
+    num_nodes = x_l.size(0)
+    num_nodes = size[1] if size is not None else num_nodes
+    num_nodes = x_r.size(0) if x_r is not None else num_nodes
+    adj, _ = remove_self_loops(adj)
+    adj, _ = add_self_loops(adj, num_nodes=num_nodes)
+    return adj
+
+
+class HGAConv(MessagePassing):
     """
-    Graph Attention Path Convolution
+    Heterogeneous Graph Attention Convolution
     """
     def _forward_unimplemented(self, *input: Any) -> None:
         pass
@@ -40,7 +49,7 @@ class GAPConv(MessagePassing):
                  dropout: float = 0.,
                  add_self_loops: bool = True,
                  bias: bool = True, **kwargs):
-        super(GAPConv, self).__init__(aggr='add', node_dim=0, **kwargs)
+        super(HGAConv, self).__init__(aggr='add', node_dim=0, **kwargs)
 
         self.in_channels = in_channels
         self.out_channels = out_channels
@@ -78,12 +87,11 @@ class GAPConv(MessagePassing):
         glorot(self.att_r)
         zeros(self.bias)
 
-    def forward(self, x: Union[Tensor, OptPairTensor], edge_index: Adj,
-                size: Size = None, return_attention_weights=None):
+    def forward(self, x, adj, size=None, return_attention_weights=None):
         """
         Args:
             x: Tensor
-            edge_index: Tensor
+            adj: Tensor or list of Tensor
             size: Size
             return_attention_weights (bool, optional): If set to :obj:`True`,
                 will additionally return the tuple
@@ -91,18 +99,19 @@ class GAPConv(MessagePassing):
                 attention weights for each edge. (default: :obj:`None`)
         """
         h, c = self.heads, self.out_channels
+        assert (not isinstance(x, Tensor)) and h == len(adj), 'Number of heads is number of adjacency matrices'
 
-        x_l: OptTensor = None
-        x_r: OptTensor = None
-        alpha_l: OptTensor = None
-        alpha_r: OptTensor = None
+        x_l = None
+        x_r = None
+        alpha_l = None
+        alpha_r = None
         if isinstance(x, Tensor):
-            assert x.dim() == 2, 'Static graphs not supported in `GATConv`.'
+            assert x.dim() == 2, 'Static graphs not supported in `HGAConv`.'
             x_l = x_r = self.lin_l(x).view(-1, h, c)
             alpha_l = alpha_r = (x_l * self.att_l).sum(dim=-1)  # dot product
-        else:
+        else:   # for bipartite graph
             x_l, x_r = x[0], x[1]
-            assert x[0].dim() == 2, 'Static graphs not supported in `GATConv`.'
+            assert x[0].dim() == 2, 'Static graphs not supported in `HGAConv`.'
             x_l = self.lin_l(x_l).view(-1, h, c)
             alpha_l = (x_l * self.att_l).sum(dim=-1)
             if x_r is not None:
@@ -113,17 +122,14 @@ class GAPConv(MessagePassing):
         assert alpha_l is not None
 
         if self.add_self_loops:
-            if isinstance(edge_index, Tensor):
-                num_nodes = x_l.size(0)
-                num_nodes = size[1] if size is not None else num_nodes
-                num_nodes = x_r.size(0) if x_r is not None else num_nodes
-                edge_index, _ = remove_self_loops(edge_index)
-                edge_index, _ = add_self_loops(edge_index, num_nodes=num_nodes)
-            elif isinstance(edge_index, SparseTensor):
-                edge_index = set_diag(edge_index)
+            if isinstance(adj, Tensor):
+                adj = add_self_loop(x_l, x_r, size, adj)
+            else:
+                for i in range(len(adj)):
+                    adj[i] = add_self_loop(x_l, x_r, size, adj[i])
 
         # propagate_type: (x: OptPairTensor, alpha: OptPairTensor)
-        out = self.propagate(edge_index, x=(x_l, x_r),
+        out = self.propagate(adj, x=(x_l, x_r),
                              alpha=(alpha_l, alpha_r), size=size)
 
         alpha = self._alpha
@@ -139,10 +145,10 @@ class GAPConv(MessagePassing):
 
         if isinstance(return_attention_weights, bool):
             assert alpha is not None
-            if isinstance(edge_index, Tensor):
-                return out, (edge_index, alpha)
-            elif isinstance(edge_index, SparseTensor):
-                return out, edge_index.set_value(alpha, layout='coo')
+            if isinstance(adj, Tensor):
+                return out, (adj, alpha)
+            elif isinstance(adj, SparseTensor):
+                return out, adj.set_value(alpha, layout='coo')
         else:
             return out
 
