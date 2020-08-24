@@ -1,3 +1,5 @@
+from typing import Any
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -9,10 +11,14 @@ from . import graph as graf
 from .utils import conv_init
 from .st_residual_unit import STResidualUnit, STUnit
 
+
 class STGraphConvResnet(nn.Module):
     """ Spatio-Temporal Graph Convolutional Residual Network
         for skeleton action recognition
     """
+
+    def _forward_unimplemented(self, *input: Any) -> None:
+        pass
 
     def __init__(self,
                  channel,

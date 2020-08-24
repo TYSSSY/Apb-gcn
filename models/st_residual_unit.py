@@ -5,6 +5,7 @@ from torch.autograd import Variable
 
 from .utils import conv_init
 
+
 class STUnit(nn.Module):
     def __init__(self,
                  in_channels,
@@ -23,8 +24,7 @@ class STUnit(nn.Module):
         self.V = A.size()[-1]
 
         # The adjacency matrices of the graph (different node-node similarities)
-        self.A = Variable(
-            A.clone(), requires_grad=False).view(-1, self.V, self.V)
+        self.A = Variable(A.clone(), requires_grad=False).view(-1, self.V, self.V)
 
         # number of adjacency matrices (number of partitions)
         self.num_A = self.A.size()[0]
@@ -41,7 +41,7 @@ class STUnit(nn.Module):
         # if false, all nodes share parameters.
         self.use_local_bn = use_local_bn
 
-        # Convolutions for each parition (different similarities => different weights)
+        # Convolutions for each partition (different similarities => different weights)
         self.conv_list = nn.ModuleList([
             nn.Conv2d(
                 self.in_channels,
@@ -62,7 +62,7 @@ class STUnit(nn.Module):
             self.out_channels,
             self.out_channels,
             kernel_size=(kernel_size, 1),
-            padding=(int((kernel_size - 1)/2), 0),
+            padding=(int((kernel_size - 1) / 2), 0),
             stride=(stride, 1),
             bias=True
         )
@@ -133,14 +133,14 @@ class STResidualUnit(nn.Module):
         self.dataset = dataset
         if multiscale:
             self.stUnit = nn.Sequential(
-                STUnit(in_channels, out_channels/2, A,
-                    use_local_bn, kernel_size, stride, dropout, mask_learning, dataset),
-                STUnit(in_channels, out_channels-out_channels/2, A,
-                    use_local_bn, kernel_size*2-1, stride, dropout, mask_learning, dataset))
+                STUnit(in_channels, out_channels / 2, A,
+                       use_local_bn, kernel_size, stride, dropout, mask_learning, dataset),
+                STUnit(in_channels, out_channels - out_channels / 2, A,
+                       use_local_bn, kernel_size * 2 - 1, stride, dropout, mask_learning, dataset))
         else:
             self.stUnit = nn.Sequential(
                 STUnit(in_channels, out_channels, A,
-                    use_local_bn, kernel_size, stride, dropout, mask_learning, dataset))
+                       use_local_bn, kernel_size, stride, dropout, mask_learning, dataset))
 
         self.relu = nn.ReLU()
 

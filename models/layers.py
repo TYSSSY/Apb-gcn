@@ -31,10 +31,15 @@ class GAPConv(MessagePassing):
 
     _alpha: OptTensor
 
-    def __init__(self, in_channels: Union[int, Tuple[int, int]],
-                 out_channels: int, heads: int = 1, concat: bool = True,
-                 negative_slope: float = 0.2, dropout: float = 0.,
-                 add_self_loops: bool = True, bias: bool = True, **kwargs):
+    def __init__(self,
+                 in_channels: Union[int, Tuple[int, int]],
+                 out_channels: int,
+                 heads: int = 1,
+                 concat: bool = True,
+                 negative_slope: float = 0.2,
+                 dropout: float = 0.,
+                 add_self_loops: bool = True,
+                 bias: bool = True, **kwargs):
         super(GAPConv, self).__init__(aggr='add', node_dim=0, **kwargs)
 
         self.in_channels = in_channels
@@ -94,7 +99,7 @@ class GAPConv(MessagePassing):
         if isinstance(x, Tensor):
             assert x.dim() == 2, 'Static graphs not supported in `GATConv`.'
             x_l = x_r = self.lin_l(x).view(-1, h, c)
-            alpha_l = alpha_r = (x_l * self.att_l).sum(dim=-1)
+            alpha_l = alpha_r = (x_l * self.att_l).sum(dim=-1)  # dot product
         else:
             x_l, x_r = x[0], x[1]
             assert x[0].dim() == 2, 'Static graphs not supported in `GATConv`.'
@@ -141,8 +146,12 @@ class GAPConv(MessagePassing):
         else:
             return out
 
-    def message(self, x_j: Tensor, alpha_j: Tensor, alpha_i: OptTensor,
-                index: Tensor, ptr: OptTensor,
+    def message(self,
+                x_j: Tensor,
+                alpha_j: Tensor,
+                alpha_i: OptTensor,
+                index: Tensor,
+                ptr: OptTensor,
                 size_i: Optional[int]) -> Tensor:
         alpha = alpha_j if alpha_i is None else alpha_j + alpha_i
         alpha = fn.leaky_relu(alpha, self.negative_slope)
