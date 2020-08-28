@@ -146,7 +146,7 @@ class NTUDataset(Dataset):
 
     @property
     def processed_file_names(self):
-        return ['data_1.pt', 'data_2.pt']
+        return ['train.pt', 'validate.pt']
 
     # def download(self):
     #     # Download to `self.raw_dir`.
@@ -158,7 +158,10 @@ class NTUDataset(Dataset):
         i = 0
         sample_name = []
         sample_label = []
-        self.size = len(raw_paths)
+        training_data = []
+        validating_data = []
+        self.size = len(self.raw_paths)
+        
         for filename in self.raw_paths:
             # if filename in ignored_samples:
             #     continue
@@ -168,6 +171,7 @@ class NTUDataset(Dataset):
                 filename[filename.find('P') + 1:filename.find('P') + 4])
             camera_id = int(
                 filename[filename.find('C') + 1:filename.find('C') + 4])
+
 
             if benchmark == 'cv':
                 istraining = (camera_id in training_cameras)
@@ -200,21 +204,27 @@ class NTUDataset(Dataset):
                 pyg_y[i] = sample_label[i]
 
             data = Data(x=pyg_x, edge_index=edge_index.t().contiguous(), y=pyg_y)
+            data.num_nodes = 25
 
             if self.pre_filter is not None and not self.pre_filter(data):
                 continue
 
             if self.pre_transform is not None:
                 data = self.pre_transform(data)
-
-            torch.save(data, os.path.join(self.processed_dir, 'data_{}.pt'.format(i)))
+            
+            if issample:
+                training_data.append(data)
+            else:
+                validating_data.append(data)
             i += 1
+        torch.save(training_data, os.path.join(self.processed_dir, 'train.pt'))
+        torch.save(validating_data, os.path.join(self.processed_dir, 'validate.pt'))
 
     def len(self):
         return len(self.processed_file_names)
 
     def get(self, idx):
-        data = torch.load(os.path.join(self.processed_dir, 'data_{}.pt'.format(idx)))
+        data = torch.load(os.path.join(self.processed_dir, 'train.pt'.format(idx)))
         return data
 
     def get_batch(self):
@@ -235,19 +245,20 @@ class NTUDataset(Dataset):
 if __name__ == '__main__':
 
     # n_batch_size should be a divisor of number of pt files.
-    n_batch_size = 4
+    n_batch_size = 100
     ntu_dataset = NTUDataset("/app", batch_size=n_batch_size)
 
-    batch = ntu_dataset.get_batch()
-    while batch:
-        print(batch)
-        batch = ntu_dataset.get_batch()
-
-    # # ntu_dataset.get(1)
-    # ntu_dataloader = DataLoader(ntu_dataset, batch_size=n_batch_size, shuffle=False)
-    # # print(next(iter(ntu_dataloader)))
-    # count = 0
-    # for batch in ntu_dataloader:
+    # batch = ntu_dataset.get_batch()
+    # while batch:
     #     print(batch)
-    #     count += 1
-    # print(count)
+    #     batch = ntu_dataset.get_batch()
+
+    # ntu_dataset.get(1)
+    ntu_dataloader = DataLoader(ntu_dataset, batch_size=n_batch_size, shuffle=False)
+    # print(next(iter(ntu_dataloader)))
+    count = 0
+    for batch in (ntu_dataloader):
+        print(len(batch))
+        print(batch[0].num_graphs)
+        count += 1
+    print(count)

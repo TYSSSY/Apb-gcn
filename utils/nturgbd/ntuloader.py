@@ -50,10 +50,10 @@ class NTULoader(Dataset):
 
         if is_training:
             self.data_path = os.path.join(split_dir, 'train_data.npy')
-            self.label_path = os.path.join(split_dir, 'train_label.pkl')
+            # self.label_path = os.path.join(split_dir, 'train_label.pkl')
         else:
             self.data_path = os.path.join(split_dir, 'val_data.npy')
-            self.label_path = os.path.join(split_dir, 'val_label.pkl')
+            # self.label_path = os.path.join(split_dir, 'val_label.pkl')
 
         """ Load the labels from the pickle file
             Each record -> (sample_name, label)
