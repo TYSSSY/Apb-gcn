@@ -235,6 +235,8 @@ class Runner(object):
         self.print_log('Eval epoch: {}'.format(epoch + 1))
         loss_value = []
         score_frag = []
+        global best_valid
+        best_valid = []
         with torch.no_grad():
             for batch_idx, (data, label) in enumerate(self.test_loader):
                 data = Variable(
