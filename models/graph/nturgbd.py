@@ -10,19 +10,20 @@ outward = [(j, i) for (i, j) in inward]
 neighbor = inward + outward
 
 head = [(2, 3), (2, 20), (20, 4), (20, 8)]
-lefthand = [(4, 5), (5, 6), (6, 7), (7, 22), (22, 21)]
-righthand = [(8, 9), (9, 10), (10, 11), (11, 24), (24, 23)]
-hands = lefthand + righthand
+left_hand = [(4, 5), (5, 6), (6, 7), (7, 22), (22, 21)]
+right_hand = [(8, 9), (9, 10), (10, 11), (11, 24), (24, 23)]
+hands = left_hand + right_hand
 torso = [(20, 4), (20, 8), (20, 1), (1, 0), (0, 12), (0, 16)]
-leftleg = [(0, 12), (12, 13), (13, 14), (14, 15)]
-rightleg = [(0, 16), (16, 17), (17, 18), (18, 19)]
-legs = leftleg + rightleg
+left_leg = [(0, 12), (12, 13), (13, 14), (14, 15)]
+right_leg = [(0, 16), (16, 17), (17, 18), (18, 19)]
+legs = left_leg + right_leg
+
 
 class NTUGraph(Graph):
     def __init__(self,
                  labeling_mode='uniform'):
         super(NTUGraph, self).__init__(num_node=num_node,
-                                      inward=inward,
-                                      outward=outward,
-                                      parts=[head, hands, torso, legs],
-                                      labeling_mode=labeling_mode)
+                                       inward=inward,
+                                       outward=outward,
+                                       parts=[head, hands, torso, legs],
+                                       labeling_mode=labeling_mode)
