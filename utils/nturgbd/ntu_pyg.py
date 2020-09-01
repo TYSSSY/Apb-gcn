@@ -133,7 +133,7 @@ class NTUDataset(Dataset):
         super(NTUDataset, self).__init__(root, transform, pre_transform)
         self.index = 0
         self.batch_size = batch_size
-        self.size = len(self.raw_file_names)
+
         # self.raw_paths = "/app/nturgb+d_skeletons"
         # self.processed_dir = "/save_path"
 
@@ -161,6 +161,7 @@ class NTUDataset(Dataset):
         training_data = []
         validating_data = []
         self.size = len(self.raw_paths)
+        self.data = []
         
         for filename in self.raw_paths:
             # if filename in ignored_samples:
@@ -200,65 +201,75 @@ class NTUDataset(Dataset):
                 data = read_xyz(
                     os.path.join(filename, s), max_body=max_body, num_joint=num_joint)
                 modified_data = np.transpose(data, [2, 0, 1, 3])
+
+                # For saving purposes
                 pyg_x[:, :, 0:data.shape[1], :, i] = modified_data
-                pyg_y[i] = sample_label[i]
+                pyg_y[i] = sample_label[i] 
+                
+                # For creating batches
+                data_pyg = Data(x=pyg_x, edge_index=edge_index.t().contiguous(), y=sample_label[i])
+                data_pyg.num_nodes = 25
+                self.data.append(data_pyg)
 
-            data = Data(x=pyg_x, edge_index=edge_index.t().contiguous(), y=pyg_y)
-            data.num_nodes = 25
+                
 
-            if self.pre_filter is not None and not self.pre_filter(data):
+            #data = Data(x=pyg_x, edge_index=edge_index.t().contiguous(), y=pyg_y)
+            #data.num_nodes = 25
+
+            if self.pre_filter is not None and not self.pre_filter(modified_data):
                 continue
 
             if self.pre_transform is not None:
-                data = self.pre_transform(data)
+                data = self.pre_transform(modified_data)
             
             if issample:
-                training_data.append(data)
+                training_data.append(modified_data)
             else:
-                validating_data.append(data)
+                validating_data.append(modified_data)
             i += 1
         torch.save(training_data, os.path.join(self.processed_dir, 'train.pt'))
         torch.save(validating_data, os.path.join(self.processed_dir, 'validate.pt'))
 
     def len(self):
-        return len(self.processed_file_names)
+        return len(self.raw_paths)
 
     def get(self, idx):
-        data = torch.load(os.path.join(self.processed_dir, 'train.pt'.format(idx)))
+        data = self.data[idx]
         return data
 
-    def get_batch(self):
-        batch = []
-        for i in range(self.index, self.index+self.batch_size):
-            if i < self.size:
-                data = self.get(i)
-                batch.append(data)
-                self.index += 1
-            else:
-                break
-        if not batch:
-            return
-        batch = Batch.from_data_list(batch,  follow_batch=[])
-        return batch
+    # def get_batch(self):
+    #     batch = []
+    #     for i in range(self.index, self.index+self.batch_size):
+    #         if i < self.size:
+    #             data = self.get(i)
+    #             batch.append(data)
+    #             self.index += 1
+    #         else:
+    #             break
+    #     if not batch:
+    #         return
+    #     batch = Batch.from_data_list(batch,  follow_batch=[])
+    #     return batch
 
 
 if __name__ == '__main__':
 
     # n_batch_size should be a divisor of number of pt files.
-    n_batch_size = 100
+    n_batch_size = 2
     ntu_dataset = NTUDataset("/app", batch_size=n_batch_size)
 
-    # batch = ntu_dataset.get_batch()
-    # while batch:
-    #     print(batch)
-    #     batch = ntu_dataset.get_batch()
 
-    # ntu_dataset.get(1)
     ntu_dataloader = DataLoader(ntu_dataset, batch_size=n_batch_size, shuffle=False)
-    # print(next(iter(ntu_dataloader)))
+
     count = 0
-    for batch in (ntu_dataloader):
+    i = 0
+    batch = None
+    for b in (ntu_dataloader):
+        batch = b
+        # break
+        print('Index', count)
         print(len(batch))
-        print(batch[0].num_graphs)
+        print(batch)
         count += 1
-    print(count)
+    # # batch = ntu_dataloader[0]
+    # # print(count)
