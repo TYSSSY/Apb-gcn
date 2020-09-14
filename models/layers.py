@@ -11,28 +11,13 @@ from torch_geometric.nn.conv import MessagePassing
 from torch_geometric.nn.inits import glorot, zeros
 from torch_geometric.utils import remove_self_loops, add_self_loops, softmax
 
-from utils.linalg import batched_spmm
+from utils.linalg import batched_spmm, batched_transpose
 
 
 def clones(module, k):
     return nn.ModuleList(
         copy.deepcopy(module) for _ in range(k)
     )
-
-
-def edge_score(adj, a_l, a_r):
-    """
-    Args:
-        adj: adjacency matrix [2, num_edges] or (heads, [2, num_edges])
-        a_l: Tensor           [N, heads]
-        a_r: Tensor           [N, heads]
-    """
-    if isinstance(adj, Tensor):
-        return a_l[adj[0], :] + a_r[adj[1], :]  # [num_edges, heads]
-    a = []
-    for i in range(len(adj)):
-        a[i] = a_l[adj[i][0], i] + a_r[adj[i][1], i]
-    return a  # (heads, [num_edges, 1])
 
 
 def self_loop_augment(num_nodes, adj):
@@ -96,6 +81,21 @@ class HGAConv(MessagePassing):
         glorot(self.att_r)
         zeros(self.bias)
 
+    @staticmethod
+    def edge_score(adj, a_l, a_r):
+        """
+        Args:
+            adj: adjacency matrix [2, num_edges] or (heads, [2, num_edges])
+            a_l: Tensor           [N, heads]
+            a_r: Tensor           [N, heads]
+        """
+        if isinstance(adj, Tensor):
+            return a_l[adj[0], :] + a_r[adj[1], :]  # [num_edges, heads]
+        a = []
+        for i in range(len(adj)):
+            a[i] = a_l[adj[i][0], i] + a_r[adj[i][1], i]
+        return a  # (heads, [num_edges, 1])
+
     def forward(self, x, adj, size=None, return_attention_weights=None):
         """
         Args:
@@ -147,14 +147,22 @@ class HGAConv(MessagePassing):
         alpha = self._alpha
         self._alpha = None
 
-        if self.concat:
-            out = out.view(-1, self.heads * self.out_channels)
+        if self.concat:  # TODO if 'out' is Tuple(Tensor, Tensor)
+            if isinstance(out, Tensor):
+                out = out.view(-1, self.heads * self.out_channels)
+            else:
+                out = (out[0].view(-1, self.heads * self.out_channels),
+                       out[1].view(-1, self.heads * self.out_channels))
         else:
-            out = out.mean(dim=1)
-
+            if isinstance(out, Tensor):
+                out = out.mean(dim=1)
+            else:
+                out = (out[0].mean(dim=1), out[1].mean(dim=1))
         if self.bias is not None:
-            out += self.bias
-
+            if isinstance(out, Tensor):
+                out += self.bias
+            else:
+                out = (out[0] + self.bias, out[1] + self.bias)
         if isinstance(return_attention_weights, bool):
             assert alpha is not None
             return out, (adj, alpha)
@@ -167,7 +175,7 @@ class HGAConv(MessagePassing):
 
         x = kwargs.get('x', Pr.empty)  # OptPairTensor
         alpha = kwargs.get('alpha', Pr.empty)  # PairTensor
-        score = edge_score(adj=adj, a_l=alpha[0], a_r=alpha[1])
+        score = self.edge_score(adj=adj, a_l=alpha[0], a_r=alpha[1])
         out = self.message_and_aggregate(adj, x=x, score=score)
 
         return self.update(out)
@@ -179,31 +187,39 @@ class HGAConv(MessagePassing):
         return fn.dropout(alpha, p=self.dropout, training=self.training)
 
     def message_and_aggregate(self,
-                              adj,     # Tensor or list(Tensor)
-                              x,       # Union(Tensor, PairTensor) for bipartite graph
-                              score):  # Tensor or list(Tensor)
-        n, c = x.size()
-        x_l, x_r, out_l, out_r = None, None, None, None
+                              adj,
+                              x,
+                              score):
+        """
+        Args:
+            adj:   Tensor or list(Tensor)
+            x:     Union(Tensor, PairTensor) for bipartite graph
+            score: Tensor or list(Tensor)
+        """
+        # for bipartite graph, x_l -> out_ and x_r -> out_l (interleaved)
+        x_l, x_r, out_, out_l = None, None, None, None
+        n, m = 0, 0
         if isinstance(x, Tensor):
             x_l = x
-            n, c = x.size()
-            out_l = torch.zeros((n, c, self.heads))
         else:
             x_l, x_r = x[0], x[1]
-            (n, c1), (m, c2) = x_l.size(), x_r.size()
-            out_l = torch.zeros((n, c1, self.heads))
-            out_r = torch.zeros((m, c2, self.heads))
+            (m, c2) = x_r.size()
+            out_l = torch.zeros((m, c2, self.heads))
 
         if isinstance(adj, Tensor):
             alpha = self._attention(adj, score)  # [num_edges, heads]
-            # sparse matrix multiplication of X and A (attention matrix)
-        else:
+        else:  # adj is list of Tensor
             alpha = []
             for i in range(self.heads):
                 alpha.append(self._attention(adj[i], score[i]))
-        out = batched_spmm(alpha, adj, x_l)
 
-        return out.permute(1, 0, 2)
+        out_ = batched_spmm(alpha, adj, x_l)
+        if x_r is None:
+            return out_.permute(1, 0, 2)
+        else:
+            adj, alpha = batched_transpose(adj, alpha)
+            out_l = batched_spmm(alpha, adj, x_r)
+            return out_.permute(1, 0, 2), out_l.permute(1, 0, 2)
 
     def __repr__(self):
         return '{}({}, {}, heads={})'.format(self.__class__.__name__,
