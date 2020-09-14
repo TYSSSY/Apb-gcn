@@ -27,7 +27,7 @@ def batched_spmm(nzt, adj, x, m=None, n=None):
         adj_ = torch.cat([adj + offset * i for i in range(heads)], dim=1)
         nzt_ = nzt.view(1, -1)
         out = spmm(adj_, nzt_, m * heads, n * heads, x_)
-        else:  # adj is list of adjacency matrices
+    else:  # adj is list of adjacency matrices
         assert heads == len(adj), "the number of heads and the number of adjacency matrices are not matched"
         m = max([maybe_num_nodes(adj_[0], m) for adj_ in adj])
         n = max([maybe_num_nodes(adj_[1], n) for adj_ in adj])
