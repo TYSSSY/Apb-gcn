@@ -38,10 +38,10 @@ class HGAConv(MessagePassing):
                  in_channels: Union[int, Tuple[int, int]],
                  out_channels: int,
                  heads: int = 1,
-                 concat: bool = True,
+                 concat: bool = False,
                  negative_slope: float = 0.2,
                  dropout: float = 0.,
-                 use_self_loops: bool = True,
+                 use_self_loops: bool = False,  # Set to False for debug
                  bias: bool = True, **kwargs):
         super(HGAConv, self).__init__(aggr='add', node_dim=0, **kwargs)
 
@@ -54,17 +54,18 @@ class HGAConv(MessagePassing):
         self.add_self_loops = use_self_loops
 
         if isinstance(in_channels, int):
-            self.lin_l = Linear(in_channels, heads * out_channels, bias=False)
+            self.lin_l = Linear(in_channels, out_channels, bias=False)
+
             self.lin_r = self.lin_l
         else:
-            self.lin_l = Linear(in_channels[0], heads * out_channels, False)
-            self.lin_r = Linear(in_channels[1], heads * out_channels, False)
+            self.lin_l = Linear(in_channels[0], out_channels, False)
+            self.lin_r = Linear(in_channels[1], out_channels, False)
 
-        self.att_l = Parameter(torch.Tensor(1, heads, out_channels))
-        self.att_r = Parameter(torch.Tensor(1, heads, out_channels))
+        self.att_l = Parameter(torch.Tensor(out_channels, heads))
+        self.att_r = Parameter(torch.Tensor(out_channels, heads))
 
         if bias and concat:
-            self.bias = Parameter(torch.Tensor(heads * out_channels))
+            self.bias = Parameter(torch.Tensor(out_channels * heads))
         elif bias and not concat:
             self.bias = Parameter(torch.Tensor(out_channels))
         else:
@@ -82,18 +83,18 @@ class HGAConv(MessagePassing):
         zeros(self.bias)
 
     @staticmethod
-    def edge_score(adj, a_l, a_r):
+    def edge_score(adj, a_l, a_r, is_cross):
         """
         Args:
             adj: adjacency matrix [2, num_edges] or (heads, [2, num_edges])
-            a_l: Tensor           [N, heads]
-            a_r: Tensor           [N, heads]
+            a_l: Tensor           [num_nodes, heads]
+            a_r: Tensor           [num_nodes, heads]
         """
         if isinstance(adj, Tensor):
-            return a_l[adj[0], :] + a_r[adj[1], :]  # [num_edges, heads]
+            return a_l[adj[1], :] + a_r[adj[0], :]  # [num_edges, heads]
         a = []
         for i in range(len(adj)):
-            a[i] = a_l[adj[i][0], i] + a_r[adj[i][1], i]
+            a[i] = a_l[adj[i][1], i] + a_r[adj[i][0], i]
         return a  # (heads, [num_edges, 1])
 
     def forward(self, x, adj, size=None, return_attention_weights=None):
@@ -108,7 +109,7 @@ class HGAConv(MessagePassing):
                 attention weights for each edge. (default: :obj:`None`)
         """
         h, c = self.heads, self.out_channels
-        assert (not isinstance(x, Tensor)) and h == len(adj), 'Number of heads is number of adjacency matrices'
+        # assert (not isinstance(adj, Tensor)) and h == len(adj), 'Number of heads is number of adjacency matrices'
 
         x_l, x_r, alpha_l, alpha_r = None, None, None, None
 
@@ -117,14 +118,13 @@ class HGAConv(MessagePassing):
         else:
             x_l, x_r = x[0], x[1]
         assert x_l.dim() == 2, 'Static graphs not supported in `HGAConv`.'
-        x_l = self.lin_l(x_l).view(-1, h, c)  # dims: (N, h, c)
-        alpha_l = (x_l * self.att_l).sum(dim=-1)
+        x_l = self.lin_l(x_l)
+        alpha_l = torch.mm(x_l, self.att_l)
         if x_r is not None:
-            x_r = self.lin_r(x_r).view(-1, h, c)  # dims: (N, h, c)
-            alpha_r = (x_r * self.att_r).sum(dim=-1)  # reduce((N, h, c) x (h, c), c) = (N, h)
+            x_r = self.lin_r(x_r)
+            alpha_r = torch.mm(x_r, self.att_r)
         else:
-            alpha_r = (x_l * self.att_r).sum(dim=-1)
-
+            alpha_r = torch.mm(x_l, self.att_r)
         assert x_l is not None
         assert alpha_l is not None
 
@@ -133,15 +133,17 @@ class HGAConv(MessagePassing):
             num_nodes = size[1] if size is not None else num_nodes
             num_nodes = x_r.size(0) if x_r is not None else num_nodes
             if isinstance(adj, Tensor):
-                adj = self_loop_augment(num_nodes, adj)
+                adj = self_loop_augment(num_nodes, adj)  # TODO Bug found
             else:
                 for i in range(len(adj)):
                     adj[i] = self_loop_augment(num_nodes, adj[i])
 
         # propagate_type: (x: OptPairTensor, alpha: OptPairTensor)
+        xpar = (x_l, x_r) if x_r is not None else x_l
+        alphapar = (alpha_l, alpha_r)
         out = self.propagate(adj,
-                             x=(x_l, x_r),
-                             alpha=(alpha_l, alpha_r),
+                             x=xpar,
+                             alpha=alphapar,
                              size=size)
 
         alpha = self._alpha
@@ -149,10 +151,10 @@ class HGAConv(MessagePassing):
 
         if self.concat:  # TODO if 'out' is Tuple(Tensor, Tensor)
             if isinstance(out, Tensor):
-                out = out.view(-1, self.heads * self.out_channels)
+                out = out.reshape(-1, self.heads * self.out_channels)
             else:
-                out = (out[0].view(-1, self.heads * self.out_channels),
-                       out[1].view(-1, self.heads * self.out_channels))
+                out = (out[0].reshape(-1, self.heads * self.out_channels),
+                       out[1].reshape(-1, self.heads * self.out_channels))
         else:
             if isinstance(out, Tensor):
                 out = out.mean(dim=1)
@@ -175,7 +177,9 @@ class HGAConv(MessagePassing):
 
         x = kwargs.get('x', Pr.empty)  # OptPairTensor
         alpha = kwargs.get('alpha', Pr.empty)  # PairTensor
-        score = self.edge_score(adj=adj, a_l=alpha[0], a_r=alpha[1])
+        score = self.edge_score(
+            adj=adj, a_l=alpha[0], a_r=alpha[1], is_cross=isinstance(x, Tensor))
+
         out = self.message_and_aggregate(adj, x=x, score=score)
 
         return self.update(out)
@@ -201,9 +205,11 @@ class HGAConv(MessagePassing):
         n, m = 0, 0
         if isinstance(x, Tensor):
             x_l = x
+            n = m = x_l.size(0)
         else:
             x_l, x_r = x[0], x[1]
             (m, c2) = x_r.size()
+            n = x_l.size(0)
             out_l = torch.zeros((m, c2, self.heads))
 
         if isinstance(adj, Tensor):
@@ -213,13 +219,13 @@ class HGAConv(MessagePassing):
             for i in range(self.heads):
                 alpha.append(self._attention(adj[i], score[i]))
 
-        out_ = batched_spmm(alpha, adj, x_l)
+        out_ = batched_spmm(alpha, adj, x_l, m, n)
         if x_r is None:
             return out_.permute(1, 0, 2)
         else:
             adj, alpha = batched_transpose(adj, alpha)
-            out_l = batched_spmm(alpha, adj, x_r)
-            return out_.permute(1, 0, 2), out_l.permute(1, 0, 2)
+            out_l = batched_spmm(alpha, adj, x_r, n, m)
+            return out_l.permute(1, 0, 2), out_.permute(1, 0, 2)
 
     def __repr__(self):
         return '{}({}, {}, heads={})'.format(self.__class__.__name__,
