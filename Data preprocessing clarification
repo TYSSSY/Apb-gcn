@@ -1,0 +1,58 @@
+=================================================
+class: NTUDataset
+=================================================
+(inside class):
+parameters: 
+           - root(string): root directory.
+           
+           - batch_size(int): batch size.
+           
+           - transform(callable,optional): None for default setting.
+           
+           - pre_transform(callable,optional): None for default setting.
+           
+           - benchmark(string): data collecting type(cross view or cross subject).
+           
+           - part: data set option(training set or validating set).
+           
+           - ignored_sample_path(string): path for ignoring bad skeleton.
+
+functions:
+          - (void)__init__(self, root, batch_size, transform=None, pre_transform=None, benchmark='cv', part='val', ignored_sample_path=None): class initialization.
+                        
+          - (list)raw_file_names(self): return all raw file names.
+                        
+          - (list)processed_file_names(self): set processed files' name to 'data_{idx}.pt' format and return all those names.
+                        
+          - (void)process(self): preprocess the data.
+                        
+          - (int)len(self): return total number of file.
+                        
+          - (torch_geometric.data)get(self, idx): load and return the processed data with index specified by 'idx'.
+             
+=================================================                        
+(outside class):
+parameters:
+          - data_path(string): input data path, fixed to be "root/raw" (need to artifically create the directory).
+          
+          - out_path(string): output data path, fixed to be "root/processed" (automatically create the directory).
+          
+          - ignored_sample_path(string): path for ignoring bad skeleton.
+          
+          - benchmark(string): data collecting type(cross view or cross subject).
+          
+          - part: data set option(training set or validating set).
+          
+functions:                      
+          - (void)gendata(data_path,out_path,ignored_sample_path=None,benchmark='cv',part='val'): preprocess the data generate "torch_geometric.data" object and save it to the "out_path".
+                        
+          - (list)dataSample(data_path,out_path,ignored_sample_path=None,benchmark='cv',part='val'): return the list of "[sample_name,sample_label]" with corresponding "cs,cv" and "train,val" conditions.
+                        
+=================================================
+
+overall pipeline:
+                
+                (__init__ -> processed_file_names -> raw_file_names -> process) -> (gendata -> dataSample) -> (len -> get)
+                |<-------------------------NTUDataset------------------------>|                               |<-DataLoader->|                                                                             
+                        
+                        
