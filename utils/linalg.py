@@ -1,8 +1,17 @@
 
 import torch
 from torch import Tensor
-from torch_sparse import spmm, transpose
+from torch_sparse import spmm, transpose, spspmm
 from torch_geometric.utils.num_nodes import maybe_num_nodes
+
+
+def power_adj(adj, dim, p):
+    val = torch.ones(adj.shape[1])
+    ic, vc = spspmm(adj, val, adj, val, dim, dim, dim)
+    if p > 2:
+        for i in range(p - 2):
+            ic, vc = spspmm(ic, vc, adj, val, dim, dim, dim)
+    return ic
 
 
 def batched_spmm(nzt, adj, x, m=None, n=None):

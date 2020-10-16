@@ -1,0 +1,11 @@
+import numpy as np
+import math
+import torch
+from torch_sparse import spspmm
+
+
+def conv_init(module):
+    n = module.out_channels
+    for k in module.kernel_size:
+        n *= k
+    module.weight.data.normal_(0, math.sqrt(2. / n))
