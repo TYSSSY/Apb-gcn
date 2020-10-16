@@ -1,7 +1,6 @@
 import numpy as np
 import math
 import torch
-from torch_sparse import spspmm
 
 
 def conv_init(module):
