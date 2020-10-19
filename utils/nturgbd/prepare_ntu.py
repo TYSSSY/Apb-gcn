@@ -25,6 +25,7 @@ max_frame = 300
 
 def gendata(data_path,
             out_path,
+            plan = "synergy_matrix",
             ignored_sample_path=None,
             benchmark='cv',
             part='val'):
@@ -35,16 +36,18 @@ def gendata(data_path,
                                         ignored_sample_path,
                                         benchmark,
                                         part)
-
-    pyg_x = np.zeros((num_joint, 7, max_frame, max_body, len(sample_name)))
+    if plan == "synergy_matrix":
+        pyg_x = np.zeros((num_joint, 10, max_frame, max_body, len(sample_name)))
+    if plan == "transformer":
+        pyg_x = np.zeros((num_joint, 7, max_frame, max_body, len(sample_name)))
     pyg_y = np.zeros(len(sample_name))
 
     for i in tqdm(range(len(sample_name))):
         s = sample_name[i]
-        data = read_xyz(os.path.join(data_path, s), max_body=max_body, num_joint=num_joint)
+        data = read_xyz(os.path.join(data_path, s), plan = plan, max_body=max_body, num_joint=num_joint)
         modified_data = np.transpose(data, [2, 0, 1, 3]) #[max_frame,num_joint,num_features,max_body,clips]
         pyg_x[:, :, 0:data.shape[1], :, i] = modified_data #data
-        pyg_y[i] = sample_label[i] #label
+        pyg_y[i] = sample_label[i] #labels
         pyg_data = Data(x=pyg_x[:,:,:,:,i], edge_index=edge_index.t().contiguous(), y=pyg_y[i])
         torch.save(pyg_data, os.path.join(out_path, 'data_{}.pt'.format(i)))
     
@@ -117,5 +120,6 @@ if __name__ == '__main__':
                 out_path,
                 arg.ignored_sample_path,
                 benchmark=b,
-                part=p)
+                part=p,
+                plan = "synergy_matrix")
     

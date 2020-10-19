@@ -39,9 +39,12 @@ def read_skeleton(file):
     return skeleton_sequence
 
 
-def read_xyz(file, max_body=2, num_joint=25):
+def read_xyz(file, max_body=2, num_joint=25, plan = "synergy_matrix"):
     seq_info = read_skeleton(file)
-    data = np.zeros((7, seq_info['numFrame'], num_joint, max_body))
+    if plan == "synergy_matrix":
+        data = np.zeros((10, seq_info['numFrame'], num_joint, max_body))
+    if plan == "transformer":
+        data = np.zeros((7, seq_info['numFrame'], num_joint, max_body))
     for n, f in enumerate(seq_info['frameInfo']):
         for m, b in enumerate(f['bodyInfo']):
             for j, v in enumerate(b['jointInfo']):
@@ -62,7 +65,11 @@ def read_xyz(file, max_body=2, num_joint=25):
                             xyAngle = 0
                             yzAngle = 0
                             xzAngle = 0
-                        data[3:, n - 1, j, m] = [xyAngle, yzAngle, xzAngle, magnitude]
+                        if plan == "synergy_matrix":
+                            data[3:, n - 1, j, m] = [xyAngle, yzAngle, xzAngle, magnitude, x, y, z]
+
+                        if plan == "transformer":    
+                            data[3:, n - 1, j, m] = [xyAngle, yzAngle, xzAngle, magnitude]
 
                 else:
                     pass

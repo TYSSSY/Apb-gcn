@@ -10,7 +10,8 @@ from torch.utils.data.dataloader import default_collate
 from torch_geometric.data import DataLoader
 import torch
 from torch_geometric.data import Dataset
-from prepare_ntu import *
+#from prepare_ntu import *
+import prepare_ntu
 
 import torch.utils.data
 from torch._six import container_abcs, string_classes, int_classes
@@ -57,24 +58,25 @@ num_joint = 25
 #part = ['train', 'val']
 
 class NTUDataset(Dataset):
-    def __init__(self, root, batch_size, transform=None, pre_transform=None, benchmark='cv', part='val', ignored_sample_path=None):
+    def __init__(self, root, batch_size, transform=None, pre_transform=None, benchmark='cv', part='val', ignored_sample_path=None, plan = "synergy_matrix"):
         self.batch_size = batch_size
         self.raw_path = root + "/raw"
         self.ignored_sample_path = ignored_sample_path
         self.benchmark = benchmark
         self.part = part
+        self.plan = plan
         self.out_path = os.path.join(os.path.join(root, 'processed'), self.benchmark,self.part)
         
         if not os.path.exists(self.out_path):
             os.makedirs(self.out_path)
 
-        self.rawFileNames = dataSample(
+        self.rawFileNames = prepare_ntu.dataSample(
                                 self.raw_path,
                                 self.out_path,
                                 ignored_sample_path=self.ignored_sample_path,
                                 benchmark=self.benchmark,
-                                part=self.part
-        )
+                                part=self.part)
+        
         super(NTUDataset, self).__init__(root, transform, pre_transform)
 
     @property
@@ -90,12 +92,13 @@ class NTUDataset(Dataset):
         return processedData
 
     def process(self):
-        gendata(
+        prepare_ntu.gendata(
                 self.raw_path,
                 self.out_path,
                 ignored_sample_path = self.ignored_sample_path,
                 benchmark=self.benchmark,
-                part=self.part)
+                part=self.part,
+                plan = self.plan)
             
     def len(self):
         return len(self.raw_paths)
@@ -109,11 +112,12 @@ if __name__ == '__main__':
 
     n_batch_size = 2
     ntu_dataset = NTUDataset(
-                            "/home/lawbuntu/Downloads/pytorch_geometric-master/docker", 
+                            "/home/cchenli/Documents/Apb-gcn/utils/nturgbd", 
                             batch_size=n_batch_size, 
                             benchmark='cv',
                             part='val',
-                            ignored_sample_path=None)
+                            ignored_sample_path=None,
+                            plan = "synergy_matrix")
     
     ntu_dataloader = DataLoader(ntu_dataset, batch_size=n_batch_size, shuffle=True)
     
