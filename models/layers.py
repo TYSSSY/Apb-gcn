@@ -1,4 +1,6 @@
 import copy
+from abc import ABC
+import math
 from inspect import Parameter as Pr
 from typing import Union, Tuple, Any
 
@@ -11,7 +13,7 @@ from torch_geometric.nn.conv import MessagePassing
 from torch_geometric.nn.inits import glorot, zeros
 from torch_geometric.utils import remove_self_loops, add_self_loops, softmax
 
-from utils.linalg import batched_spmm, batched_transpose
+from utils.linalg import batched_spmm, batched_transpose, _transpose, masked_softmax
 
 
 def clones(module, k):
@@ -83,7 +85,7 @@ class HGAConv(MessagePassing):
         zeros(self.bias)
 
     @staticmethod
-    def edge_score(adj, a_l, a_r, is_cross):
+    def edge_score(adj, a_l, a_r):
         """
         Args:
             adj: adjacency matrix [2, num_edges] or (heads, [2, num_edges])
@@ -182,12 +184,10 @@ class HGAConv(MessagePassing):
 
         x = kwargs.get('x', Pr.empty)  # OptPairTensor
         alpha = kwargs.get('alpha', Pr.empty)  # PairTensor
-        score = self.edge_score(
-            adj=adj, a_l=alpha[0], a_r=alpha[1], is_cross=isinstance(x, Tensor))
+        score = self.edge_score(adj=adj, a_l=alpha[0], a_r=alpha[1])
         if not isinstance(x, Tensor):
             alpha_ = kwargs.get('alpha_', Pr.empty)
-            score_ = self.edge_score(adj=adj, a_l=alpha_[1], a_r=alpha_[
-                                     0], is_cross=isinstance(x, Tensor))
+            score_ = self.edge_score(adj=adj, a_l=alpha_[1], a_r=alpha_[0])
             score = (score, score_)
 
         out = self.message_and_aggregate(adj, x=x, score=score)
@@ -247,3 +247,81 @@ class HGAConv(MessagePassing):
         return '{}({}, {}, heads={})'.format(self.__class__.__name__,
                                              self.in_channels,
                                              self.out_channels, self.heads)
+
+
+class TemporalTransformer(nn.Module, ABC):
+    def __init__(self):
+        super(TemporalTransformer, self).__init__()
+
+    def forward(self, tensor):
+        return
+
+
+class DotProductAttention(nn.Module, ABC):
+    def __init__(self, dropout, **kwargs):
+        super(DotProductAttention, self).__init__(**kwargs)
+        self.dropout = nn.Dropout(dropout)
+
+    # `query`: (`batch_size`, #queries, `d`)
+    # `key`: (`batch_size`, #kv_pairs, `d`)
+    # `value`: (`batch_size`, #kv_pairs, `dim_v`)
+    # `valid_len`: either (`batch_size`, ) or (`batch_size`, xx)
+    def forward(self, query, key, value, valid_len=None):
+        d = query.shape[-1]
+        # Set transpose_b=True to swap the last two dimensions of key
+        scores = torch.bmm(query, key.transpose(1, 2)) / math.sqrt(d)
+        attention_weights = self.dropout(masked_softmax(scores, valid_len))
+        return torch.bmm(attention_weights, value)
+
+
+class MultiHeadAttention(nn.Module, ABC):
+    def __init__(self,
+                 key_size,
+                 query_size,
+                 value_size,
+                 num_hidden,
+                 num_heads,
+                 dropout,
+                 bias=False,
+                 **kwargs):
+        super(MultiHeadAttention, self).__init__(**kwargs)
+        self.num_heads = num_heads
+        self.attention = DotProductAttention(dropout)
+        self.wq = nn.Linear(query_size, num_hidden, bias=bias)
+        self.wk = nn.Linear(key_size, num_hidden, bias=bias)
+        self.wv = nn.Linear(value_size, num_hidden, bias=bias)
+        self.wo = nn.Linear(num_hidden, num_hidden, bias=bias)
+
+    def forward(self, query, key, value, valid_len):
+        # For self-attention, `query`, `key`, and `value` shape:
+        # (`batch_size`, `seq_len`, `dim`), where `seq_len` is the length of
+        # input sequence. `valid_len` shape is either (`batch_size`, ) or
+        # (`batch_size`, `seq_len`).
+
+        # Project and transpose `query`, `key`, and `value` from
+        # (`batch_size`, `seq_len`, `num_hidden`) to
+        # (`batch_size` * `num_heads`, `seq_len`, `num_hidden` / `num_heads`)
+        query = _transpose(self.wq(query), self.num_heads)
+        key = _transpose(self.wk(key), self.num_heads)
+        value = _transpose(self.wv(value), self.num_heads)
+
+        if valid_len is not None:
+            valid_len = torch.repeat_interleave(valid_len, repeats=self.num_heads, dim=0)
+
+        # For self-attention, `output` shape:
+        # (`batch_size` * `num_heads`, `seq_len`, `num_hidden` / `num_heads`)
+        output = self.attention(query, key, value, valid_len)
+
+        # `output_concat` shape: (`batch_size`, `seq_len`, `num_hidden`)
+        output_concat = _transpose(output, self.num_heads, reverse=True)
+        return self.wo(output_concat)
+
+
+class AddNorm(nn.Module, ABC):
+    def __init__(self, normalized_shape, dropout, **kwargs):
+        super(AddNorm, self).__init__(**kwargs)
+        self.dropout = nn.Dropout(dropout)
+        self.ln = nn.LayerNorm(normalized_shape)
+
+    def forward(self, x, y):
+        return self.ln(self.dropout(y) + x)
