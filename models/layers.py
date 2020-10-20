@@ -317,6 +317,38 @@ class MultiHeadAttention(nn.Module, ABC):
         return self.wo(output_concat)
 
 
+class BandedHeadAttention(nn.Module, ABC):
+    def __init__(self,
+                 bands,
+                 num_layers,
+                 in_channels,
+                 out_channels,
+                 num_hidden,
+                 num_heads=3,
+                 bias=False,
+                 dropout=0.5):
+        super(BandedHeadAttention, self).__init__()
+        self.bands = bands
+        self.num_heads = num_heads
+        self.dropout = dropout
+        channels = [in_channels] + [num_hidden] * num_layers + [out_channels]
+        self.synthesizers = nn.ModuleList([
+            nn.Linear(in_features=channels[i],
+                      out_features=channels[i + 1],
+                      bias=bias) for i in range(num_layers)
+        ])
+        self.wv = nn.Linear(in_features=in_channels,
+                            out_features=num_hidden,
+                            bias=bias)
+
+    def forward(self, x):
+        for i in range(len(self.synthesizers)):
+            x = fn.relu(self.synthesizers[i](x))
+        v = fn.relu(self.wv(x))
+        
+        return x
+
+
 class AddNorm(nn.Module, ABC):
     def __init__(self, normalized_shape, dropout, **kwargs):
         super(AddNorm, self).__init__(**kwargs)
