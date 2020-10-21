@@ -320,10 +320,10 @@ class MultiHeadAttention(nn.Module, ABC):
 class BandedHeadAttention(nn.Module, ABC):
     def __init__(self,
                  bands,
-                 num_layers,
                  in_channels,
                  out_channels,
                  num_hidden,
+                 num_layers=2,
                  num_heads=3,
                  bias=False,
                  dropout=0.5):
