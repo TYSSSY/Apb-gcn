@@ -100,3 +100,12 @@ def sequence_mask(x, valid_len, value=0):
                         device=x.device)[None, :] < valid_len[:, None]
     x[~mask] = value
     return x
+
+
+def get_factorized_dim(dim):
+    import math
+    s = math.sqrt(dim)
+    for i in range(int(s), dim):
+        if dim % i == 0:
+            return i
+    return s

@@ -13,7 +13,7 @@ from torch_geometric.nn.conv import MessagePassing
 from torch_geometric.nn.inits import glorot, zeros
 from torch_geometric.utils import remove_self_loops, add_self_loops, softmax
 
-from utils.linalg import batched_spmm, batched_transpose, _transpose, masked_softmax
+from utils.linalg import batched_spmm, batched_transpose, _transpose, masked_softmax, get_factorized_dim
 
 
 def clones(module, k):
@@ -320,13 +320,13 @@ class MultiHeadAttention(nn.Module, ABC):
 class SynthesizedAttention(nn.Module, ABC):
     def __init__(self,
                  in_channels,
+                 dim_attention,
                  out_channels,
-                 num_hidden,
                  bands=0,
                  num_layers=2,
                  num_heads=3,
                  factorized=False,
-                 bias=False,
+                 bias=True,
                  dropout=0.5):
         """
         Args:
@@ -336,26 +336,38 @@ class SynthesizedAttention(nn.Module, ABC):
         """
         super(SynthesizedAttention, self).__init__()
         self.bands = bands
-        self.num_heads = num_heads
         self.dropout = dropout
+        self.num_heads = num_heads
         self.factorized = factorized
+        self.dim_attention = dim_attention
+        self.synthesizers, self.synthesizers_ = None, None
 
-        channels = [in_channels] + [num_hidden] * (num_layers - 1) + [out_channels]
+        dim_att = get_factorized_dim(dim_attention) if factorized else dim_attention
+        channels = [in_channels] * num_layers + [dim_att]
         self.synthesizers = nn.ModuleList([
             nn.Linear(in_features=channels[i],
                       out_features=channels[i + 1],
                       bias=bias) for i in range(num_layers)
         ])
+        channels = [in_channels] * num_layers + [int(dim_attention / dim_att)]
+        self.synthesizers_ = nn.ModuleList([
+            nn.Linear(in_features=channels[i],
+                      out_features=channels[i + 1],
+                      bias=bias) for i in range(num_layers)
+        ]) if self.factorized else None
         self.wv = nn.Linear(in_features=in_channels,
-                            out_features=num_hidden,
+                            out_features=out_channels,
                             bias=bias)
 
     def forward(self, x):
+        v = fn.relu(self.wv(x))
+        y = x if self.factorized else None
         for i in range(len(self.synthesizers)):
             x = fn.relu(self.synthesizers[i](x))
-        v = fn.relu(self.wv(x))
+            if self.factorized:
+                y = fn.relu(self.synthesizers_[i](y))
         
-        return x
+        return v
 
 
 class AddNorm(nn.Module, ABC):
