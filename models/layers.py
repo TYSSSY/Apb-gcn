@@ -317,21 +317,30 @@ class MultiHeadAttention(nn.Module, ABC):
         return self.wo(output_concat)
 
 
-class BandedHeadAttention(nn.Module, ABC):
+class SynthesizedAttention(nn.Module, ABC):
     def __init__(self,
-                 bands,
                  in_channels,
                  out_channels,
                  num_hidden,
+                 bands=0,
                  num_layers=2,
                  num_heads=3,
+                 factorized=False,
                  bias=False,
                  dropout=0.5):
-        super(BandedHeadAttention, self).__init__()
+        """
+        Args:
+            bands int
+            in_channels int
+            out_channels int
+        """
+        super(SynthesizedAttention, self).__init__()
         self.bands = bands
         self.num_heads = num_heads
         self.dropout = dropout
-        channels = [in_channels] + [num_hidden] * num_layers + [out_channels]
+        self.factorized = factorized
+
+        channels = [in_channels] + [num_hidden] * (num_layers - 1) + [out_channels]
         self.synthesizers = nn.ModuleList([
             nn.Linear(in_features=channels[i],
                       out_features=channels[i + 1],
