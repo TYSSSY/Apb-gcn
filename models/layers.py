@@ -376,7 +376,7 @@ class SynthesizedAttention(nn.Module, ABC):
             indices, values = to_band_sparse(x)
             values = softmax(values, index=indices)
             return spmm(indices, values, m, m, v)
-        return torch.bmm(fn.softmax(x, dim=1), v)
+        return torch.bmm(fn.softmax(x, dim=-1), v)
 
 
 class AddNorm(nn.Module, ABC):
