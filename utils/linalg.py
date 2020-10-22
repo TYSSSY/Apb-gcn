@@ -66,7 +66,7 @@ def batched_transpose(adj, value, m=None, n=None):
         return adj_, vs
 
 
-def _transpose(x, num_heads, reverse=False):
+def transpose_(x, num_heads, reverse=False):
     shape = (-1, num_heads, x.shape[1], x.shape[2]) if reverse \
         else (x.shape[0], x.shape[1], num_heads, -1)
     x = torch.reshape(x, shape)
@@ -109,3 +109,19 @@ def get_factorized_dim(dim):
         if dim % i == 0:
             return i
     return s
+
+
+def to_band_sparse(x, lower=True):
+    num_nodes, num_band = x.shape[-2:]
+    import itertools as its
+    indices = torch.tensor([(i, j) for (i, j) in its.product(range(num_nodes),
+                                                             range(num_nodes))
+                            if i >= j and i - j < num_band]).transpose(1, 0)
+    if not lower:
+        idx = indices.clone()
+        indices[0, :] = idx[1, :]
+        indices[1, :] = idx[0, :]
+        t = torch.sort(indices[0, :])
+        indices = indices[:, t]
+    b = x.view(-1, torch.prod(torch.tensor(x.shape[-2:])))
+    return indices, b[:, 0: indices.shape[-1]]

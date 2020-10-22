@@ -9,11 +9,12 @@ import torch.nn as nn
 import torch.nn.functional as fn
 from torch import Tensor
 from torch.nn import Parameter, Linear
+from torch_sparse import spmm
 from torch_geometric.nn.conv import MessagePassing
 from torch_geometric.nn.inits import glorot, zeros
 from torch_geometric.utils import remove_self_loops, add_self_loops, softmax
 
-from utils.linalg import batched_spmm, batched_transpose, _transpose, masked_softmax, get_factorized_dim
+from utils.linalg import batched_spmm, batched_transpose, transpose_, masked_softmax, get_factorized_dim, to_band_sparse
 
 
 def clones(module, k):
@@ -301,9 +302,9 @@ class MultiHeadAttention(nn.Module, ABC):
         # Project and transpose `query`, `key`, and `value` from
         # (`batch_size`, `seq_len`, `num_hidden`) to
         # (`batch_size` * `num_heads`, `seq_len`, `num_hidden` / `num_heads`)
-        query = _transpose(self.wq(query), self.num_heads)
-        key = _transpose(self.wk(key), self.num_heads)
-        value = _transpose(self.wv(value), self.num_heads)
+        query = transpose_(self.wq(query), self.num_heads)
+        key = transpose_(self.wk(key), self.num_heads)
+        value = transpose_(self.wv(value), self.num_heads)
 
         if valid_len is not None:
             valid_len = torch.repeat_interleave(valid_len, repeats=self.num_heads, dim=0)
@@ -313,7 +314,7 @@ class MultiHeadAttention(nn.Module, ABC):
         output = self.attention(query, key, value, valid_len)
 
         # `output_concat` shape: (`batch_size`, `seq_len`, `num_hidden`)
-        output_concat = _transpose(output, self.num_heads, reverse=True)
+        output_concat = transpose_(output, self.num_heads, reverse=True)
         return self.wo(output_concat)
 
 
@@ -322,20 +323,20 @@ class SynthesizedAttention(nn.Module, ABC):
                  in_channels,
                  dim_attention,
                  out_channels,
-                 bands=0,
-                 num_layers=2,
                  num_heads=3,
-                 factorized=False,
+                 num_layers=2,
                  bias=True,
+                 banded=False,
+                 factorized=False,
                  dropout=0.5):
         """
         Args:
-            bands int
+            banded int
             in_channels int
             out_channels int
         """
         super(SynthesizedAttention, self).__init__()
-        self.bands = bands
+        self.banded = banded
         self.dropout = dropout
         self.num_heads = num_heads
         self.factorized = factorized
@@ -360,14 +361,23 @@ class SynthesizedAttention(nn.Module, ABC):
                             bias=bias)
 
     def forward(self, x):
+        m, _ = x.shape[-2:]
         v = fn.relu(self.wv(x))
         y = x if self.factorized else None
         for i in range(len(self.synthesizers)):
             x = fn.relu(self.synthesizers[i](x))
             if self.factorized:
                 y = fn.relu(self.synthesizers_[i](y))
-        
-        return v
+        if self.factorized:
+            l_s, r_s = x.shape[-1], y.shape[-1]
+            x = x.repeat(1, 1, r_s)
+            y = y.repeat(1, 1, l_s)
+            x = x * y
+        if self.banded:
+            indices, values = to_band_sparse(x)
+            values = softmax(values, index=indices)
+            return spmm(indices, values, m, m, v)
+        return torch.matmul(fn.softmax(x, dim=1), v)
 
 
 class AddNorm(nn.Module, ABC):
