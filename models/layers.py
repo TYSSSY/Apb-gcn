@@ -319,21 +319,20 @@ class MultiHeadAttention(nn.Module, ABC):
 
 
 class SynthesizedAttention(nn.Module, ABC):
-    def __init__(self,
-                 in_channels,
-                 dim_attention,
-                 out_channels,
-                 num_heads=3,
-                 num_layers=2,
-                 bias=True,
-                 banded=False,
-                 factorized=False,
+    def __init__(self, in_channels, dim_attention, out_channels,
+                 num_heads=3, num_layers=2,
+                 bias=True, banded=False, factorized=False,
                  dropout=0.5):
         """
         Args:
-            banded int
-            in_channels int
-            out_channels int
+            bias: bool
+            banded: bool
+            factorized: bool
+            in_channels: int
+            dim_attention: int
+            out_channels: int
+            num_heads: int
+            num_layers: int
         """
         super(SynthesizedAttention, self).__init__()
         self.banded = banded
