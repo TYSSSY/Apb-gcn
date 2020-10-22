@@ -5,7 +5,7 @@ import os, glob
 from ntu_pyg import *
 
 import numpy as np
-
+from synergy import to_synergy_matrix
 
 import torch
 import torch.nn as nn
@@ -13,8 +13,9 @@ import torch.optim as optim
 from torch.autograd import Variable
 
 from tensorboardX import SummaryWriter
+from synergy_model import Net_one
 
-mobilenet = models.mobilenet_v2()
+mobilenet = Net_one()
 
 import time
 
@@ -65,12 +66,12 @@ class AverageMeter(object):
         self.count += n
         self.avg = self.sum / self.count
 
-def adjust_learning_rate(self, epoch):
-    if self.args.optimizer == 'SGD' or self.args.optimizer == 'Adam':
-        lr = self.args.base_lr * (
-            0.1**np.sum(epoch >= np.array(self.args.step)))
-        for param_group in self.optimizer.param_groups:
-            param_group['lr'] = lr
+def adjust_learning_rate(epoch):
+    if True:
+        lr = 0.0001 * (
+            0.1**np.sum(epoch >= np.array([20, 40, 60])))
+        #for param_group in self.optimizer.param_groups:
+        #    param_group['lr'] = lr
         return lr
     else:
         raise ValueError()
@@ -82,7 +83,7 @@ def top_k(self, score, label, top_k):
 
 
 
-def train(train_loader, epoch):
+def train(train_loader, epoch, pairs):
     losses = AverageMeter()
     top1 = AverageMeter()
     top5 = AverageMeter()
@@ -102,20 +103,22 @@ def train(train_loader, epoch):
                 mobilenet.parameters(),
                 lr=10**(-6),
                 weight_decay=0.001)
-    summary_writer = SummaryWriter(logdir=logdir)
+    #summary_writer = SummaryWriter(logdir=logdir)
     log_interval = 100
 
-    for batch_idx, (data, label) in enumerate(train_loader):
-
+    for batch_idx, data in enumerate(train_loader):
+        label = data.y
         # get data
         data = Variable(
-            data, requires_grad=False)
+            data.x, requires_grad=False)
         label = Variable(
             label, requires_grad=False)
         timer['dataloader'] += timetracker.split_time()
 
+        matrix1, matrix2 = to_synergy_matrix(data, pairs) # matrix.shape [batch_size, pair_nums, 300]
+
         # forward
-        output = mobilenet(data)
+        output = mobilenet(matrix1)
         loss = nn.CrossEntropyLoss(output, label)
 
         # backward
@@ -144,10 +147,10 @@ def train(train_loader, epoch):
                     batch_idx, len(train_loader), top1.val, top1.avg,
                     top5.val, top5.avg, losses.val, losses.avg, lr))
             step = epoch * len(train_loader) + batch_idx
-            summary_writer.add_scalar('Train/AvgLoss', losses.avg, step)
-            summary_writer.add_scalar('Train/AvgTop1', top1.avg, step)
-            summary_writer.add_scalar('Train/AvgTop5', top5.avg, step)
-            summary_writer.add_scalar('Train/LearningRate', lr, step)
+            #summary_writer.add_scalar('Train/AvgLoss', losses.avg, step)
+            #summary_writer.add_scalar('Train/AvgTop1', top1.avg, step)
+            #summary_writer.add_scalar('Train/AvgTop5', top5.avg, step)
+            #summary_writer.add_scalar('Train/LearningRate', lr, step)
 
         timer['statistics'] += timetracker.split_time()
 
@@ -175,30 +178,33 @@ if __name__ == '__main__':
         plan="synergy_matrix")
 
     ntu_dataloader = DataLoader(ntu_dataset, batch_size=n_batch_size, shuffle=True)
+    get_pair = get_pairs()
 
-    '''
+    
     count = 0
     i = 0
     batch = None
-    pairs = [(1, 2), (3, 4)]
+    pairs = get_pair.total_collection
+
+    '''
     for b in (ntu_dataloader):
         batch = b
         matrix1, matrix2 = to_synergy_matrix(batch, pairs)
     print(count)
     '''
 
-    '''
+
     eval_interval = 5
     num_epoch = 100
     for epoch in range(num_epoch):
         eval_model = ((epoch + 1) % eval_interval == 0) or (
                 epoch + 1 == num_epoch)
 
-        train(train_loader, epoch)
+        train(ntu_dataloader, epoch, pairs)
         
         
         
-        '''
+    
 
 '''
         if eval_model:

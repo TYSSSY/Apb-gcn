@@ -1,5 +1,5 @@
 import math
-
+import torch
 import numpy as np
 
 
@@ -42,14 +42,16 @@ def read_skeleton(file):
 def read_xyz(file, max_body=2, num_joint=25, plan = "synergy_matrix"):
     seq_info = read_skeleton(file)
     if plan == "synergy_matrix":
-        data = np.zeros((10, seq_info['numFrame'], num_joint, max_body))
+        data = torch.zeros((10, seq_info['numFrame'], num_joint, max_body))
     if plan == "transformer":
-        data = np.zeros((7, seq_info['numFrame'], num_joint, max_body))
+        data = torch.zeros((7, seq_info['numFrame'], num_joint, max_body))
     for n, f in enumerate(seq_info['frameInfo']):
         for m, b in enumerate(f['bodyInfo']):
             for j, v in enumerate(b['jointInfo']):
                 if m < max_body and j < num_joint:
-                    data[:3, n, j, m] = [v['x'], v['y'], v['z']]
+                    data[0, n, j, m] = torch.tensor(v['x'])
+                    data[1, n, j, m] = torch.tensor(v['y'])
+                    data[2, n, j, m] = torch.tensor(v['z'])
                     if n > 0:
                         motionVector = data[:, n - 1, j, m] - data[:, n, j, m]
                         x = motionVector[0]
@@ -66,10 +68,21 @@ def read_xyz(file, max_body=2, num_joint=25, plan = "synergy_matrix"):
                             yzAngle = 0
                             xzAngle = 0
                         if plan == "synergy_matrix":
-                            data[3:, n - 1, j, m] = [xyAngle, yzAngle, xzAngle, magnitude, x, y, z]
+                            # data[3:, n - 1, j, m] = [xyAngle, yzAngle, xzAngle, magnitude, x, y, z]
+                            data[3, n - 1, j, m] = torch.tensor(xyAngle)
+                            data[4, n - 1, j, m] = torch.tensor(yzAngle)
+                            data[5, n - 1, j, m] = torch.tensor(xzAngle)
+                            data[6, n - 1, j, m] = torch.tensor(magnitude)
+                            data[7, n - 1, j, m] = torch.tensor(x)
+                            data[8, n - 1, j, m] = torch.tensor(y)
+                            data[9, n - 1, j, m] = torch.tensor(z)
 
                         if plan == "transformer":    
-                            data[3:, n - 1, j, m] = [xyAngle, yzAngle, xzAngle, magnitude]
+                            # data[3:, n - 1, j, m] = [xyAngle, yzAngle, xzAngle, magnitude]
+                            data[3, n - 1, j, m] = torch.tensor(xyAngle)
+                            data[4, n - 1, j, m] = torch.tensor(yzAngle)
+                            data[5, n - 1, j, m] = torch.tensor(xzAngle)
+                            data[6, n - 1, j, m] = torch.tensor(magnitude)
 
                 else:
                     pass
