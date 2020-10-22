@@ -44,6 +44,8 @@ from torch._six import container_abcs, string_classes, int_classes
 # 24-tip of the right hand
 # 25-right thumb
 
+
+
 # edge index is based on the list above
 edge_index_plus_one = torch.tensor([(1, 2), (2, 21), (3, 21), (4, 3), (5, 21), (6, 5), (7, 6),
                     (8, 7), (9, 21), (10, 9), (11, 10), (12, 11), (13, 1),
@@ -131,4 +133,4 @@ if __name__ == '__main__':
         print(batch)
         count += 1
     print(count)
-    
+
