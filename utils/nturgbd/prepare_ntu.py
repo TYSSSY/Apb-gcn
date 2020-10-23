@@ -1,13 +1,19 @@
 import os
 import sys
 import pickle
-
+from tqdm import tqdm
 import argparse
 import numpy as np
-from numpy.lib.format import open_memmap
-from tqdm import tqdm
+import torch
+from read_skeleton import *
+from torch_geometric.data import Data
 
-from .read_skeleton import read_xyz
+edge_index_plus_one = torch.tensor([(1, 2), (2, 21), (3, 21), (4, 3), (5, 21), (6, 5), (7, 6),
+                    (8, 7), (9, 21), (10, 9), (11, 10), (12, 11), (13, 1),
+                    (14, 13), (15, 14), (16, 15), (17, 1), (18, 17), (19, 18),
+                    (20, 19), (22, 23), (23, 8), (24, 25), (25, 12)],dtype = torch.long)
+
+edge_index = torch.tensor([(i - 1, j - 1) for (i, j) in edge_index_plus_one],dtype = torch.long)
 
 training_subjects = [
     1, 2, 4, 5, 8, 9, 13, 14, 15, 16, 17, 18, 19, 25, 27, 28, 31, 34, 35, 38
@@ -22,6 +28,32 @@ def gendata(data_path,
             ignored_sample_path=None,
             benchmark='cv',
             part='val'):
+
+    sample_name,sample_label = dataSample(
+                                        data_path,
+                                        out_path,
+                                        ignored_sample_path,
+                                        benchmark,
+                                        part)
+
+    pyg_x = np.zeros((num_joint, 7, max_frame, max_body, len(sample_name)))
+    pyg_y = np.zeros(len(sample_name))
+
+    for i in tqdm(range(len(sample_name))):
+        s = sample_name[i]
+        data = read_xyz(os.path.join(data_path, s), max_body=max_body, num_joint=num_joint)
+        modified_data = np.transpose(data, [2, 0, 1, 3]) #[max_frame,num_joint,num_features,max_body,clips]
+        pyg_x[:, :, 0:data.shape[1], :, i] = modified_data #data
+        pyg_y[i] = sample_label[i] #label
+        pyg_data = Data(x=pyg_x[:,:,:,:,i], edge_index=edge_index.t().contiguous(), y=pyg_y[i])
+        torch.save(pyg_data, os.path.join(out_path, 'data_{}.pt'.format(i)))
+    
+def dataSample(data_path,
+            out_path,
+            ignored_sample_path=None,
+            benchmark='cv',
+            part='val'):
+
     if ignored_sample_path != None:
         with open(ignored_sample_path, 'r') as f:
             ignored_samples = [
@@ -29,8 +61,9 @@ def gendata(data_path,
             ]
     else:
         ignored_samples = []
-    sample_name = []
-    sample_label = []
+        sample_name = []
+        sample_label = []
+
     for filename in os.listdir(data_path):
         if filename in ignored_samples:
             continue
@@ -58,32 +91,17 @@ def gendata(data_path,
         if issample:
             sample_name.append(filename)
             sample_label.append(action_class - 1)
-
-    with open('{}/{}_label.pkl'.format(out_path, part), 'wb') as f:
-        pickle.dump((sample_name, list(sample_label)), f)
-
-    fp = open_memmap(
-        '{}/{}_data.npy'.format(out_path, part),
-        dtype='float32',
-        mode='w+',
-        shape=(len(sample_label), 7, max_frame, num_joint, max_body))
-
-    for i in tqdm(range(len(sample_name))):
-        s = sample_name[i]
-        data = read_xyz(
-            os.path.join(data_path, s), max_body=max_body, num_joint=num_joint)
-        fp[i, :, 0:data.shape[1], :, :] = data
-
+    return [sample_name,sample_label]
 
 if __name__ == '__main__':
 
     parser = argparse.ArgumentParser(description='NTURGB+D Data Converter.')
     parser.add_argument(
-        '--data_path', default='/media/ssd_storage/NTURGB+D/nturgb+d_skeletons')
+        '--data_path', default='/home/lawbuntu/Downloads/pytorch_geometric-master/docker/raw')
     parser.add_argument(
         '--ignored_sample_path',
-        default='/media/ssd_storage/NTURGB+D/samples_with_missing_skeletons.txt')
-    parser.add_argument('--out_folder', default='data/NTURGB+D')
+        default=None)
+    parser.add_argument('--out_folder', default='/home/lawbuntu/Downloads/pytorch_geometric-master/docker/processed')
 
     benchmark = ['cs', 'cv']
     part = ['train', 'val']
@@ -100,3 +118,4 @@ if __name__ == '__main__':
                 arg.ignored_sample_path,
                 benchmark=b,
                 part=p)
+    
