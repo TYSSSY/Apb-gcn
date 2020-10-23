@@ -1,13 +1,12 @@
 import os
-import time
-import numpy as np
 import pickle
 
-from torch.autograd import Variable
+import numpy as np
 from torch.utils.data.dataset import Dataset
 
 import utils
 from . import signals
+
 
 class NTULoader(Dataset):
     """ Dataset loader class for the NTURGB+D dataset
@@ -25,12 +24,13 @@ class NTULoader(Dataset):
         window_size (type int) ->
             The number of frames in each sample to be loaded
     """
+
     def __init__(self,
                  split_dir,
                  transforms=None,
-                 transform_args=dict(),
+                 transform_args=None,
                  is_training=True,
-                 signals=dict(),
+                 signals=None,
                  window_size=-1):
         self.transforms = transforms
         self.split_dir = split_dir
@@ -84,7 +84,7 @@ class NTULoader(Dataset):
         N, C, T, V, M = data.shape
         self.mean_map = data.mean(
             axis=2, keepdims=True).mean(
-                axis=4, keepdims=True).mean(axis=0)
+            axis=4, keepdims=True).mean(axis=0)
         self.std_map = data.transpose((0, 2, 4, 1, 3)).reshape(
             (N * T * M, C * V)).std(axis=0).reshape((C, 1, V, 1))
 

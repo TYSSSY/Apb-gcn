@@ -1,23 +1,23 @@
-#from __future__ import print_function
+# from __future__ import print_function
 import torchvision.models as models
-from pairs import *
-import os, glob
-from ntu_pyg import *
+from .pairs import *
+import os
+import glob
+from .ntu_pyg import *
 
 import numpy as np
-from synergy import to_synergy_matrix
+from .synergy import to_synergy_matrix
 
 import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.autograd import Variable
-
+import time
 from tensorboardX import SummaryWriter
 from synergy_model import Net_one
 
 mobilenet = Net_one()
 
-import time
 
 class Timer(object):
     def __init__(self,
@@ -49,12 +49,11 @@ class Timer(object):
         self.record_time()
         return split_time
 
+
 class AverageMeter(object):
     """Computes and stores the average and current value"""
-    def __init__(self):
-        self.reset()
 
-    def reset(self):
+    def __init__(self):
         self.val = 0
         self.avg = 0
         self.sum = 0
@@ -66,21 +65,22 @@ class AverageMeter(object):
         self.count += n
         self.avg = self.sum / self.count
 
+
 def adjust_learning_rate(epoch):
     if True:
         lr = 0.0001 * (
-            0.1**np.sum(epoch >= np.array([20, 40, 60])))
-        #for param_group in self.optimizer.param_groups:
+                0.1 ** np.sum(epoch >= np.array([20, 40, 60])))
+        # for param_group in self.optimizer.param_groups:
         #    param_group['lr'] = lr
         return lr
     else:
         raise ValueError()
 
+
 def top_k(self, score, label, top_k):
     rank = score.argsort()
     hit_top_k = [l in rank[i, -top_k:] for i, l in enumerate(label)]
     return sum(hit_top_k) * 1.0 / len(hit_top_k)
-
 
 
 def train(train_loader, epoch, pairs):
@@ -100,10 +100,10 @@ def train(train_loader, epoch, pairs):
     timer = dict(dataloader=0.001, model=0.001, statistics=0.001)
 
     optimizer = optim.Adam(
-                mobilenet.parameters(),
-                lr=10**(-6),
-                weight_decay=0.001)
-    #summary_writer = SummaryWriter(logdir=logdir)
+        mobilenet.parameters(),
+        lr=10 ** (-6),
+        weight_decay=0.001)
+    # summary_writer = SummaryWriter(logdir=logdir)
     log_interval = 100
 
     for batch_idx, data in enumerate(train_loader):
@@ -115,7 +115,7 @@ def train(train_loader, epoch, pairs):
             label, requires_grad=False)
         timer['dataloader'] += timetracker.split_time()
 
-        matrix1, matrix2 = to_synergy_matrix(data, pairs) # matrix.shape [batch_size, pair_nums, 300]
+        matrix1, matrix2 = to_synergy_matrix(data, pairs)  # matrix.shape [batch_size, pair_nums, 300]
 
         # forward
         output = mobilenet(matrix1)
@@ -147,10 +147,10 @@ def train(train_loader, epoch, pairs):
                     batch_idx, len(train_loader), top1.val, top1.avg,
                     top5.val, top5.avg, losses.val, losses.avg, lr))
             step = epoch * len(train_loader) + batch_idx
-            #summary_writer.add_scalar('Train/AvgLoss', losses.avg, step)
-            #summary_writer.add_scalar('Train/AvgTop1', top1.avg, step)
-            #summary_writer.add_scalar('Train/AvgTop5', top5.avg, step)
-            #summary_writer.add_scalar('Train/LearningRate', lr, step)
+            # summary_writer.add_scalar('Train/AvgLoss', losses.avg, step)
+            # summary_writer.add_scalar('Train/AvgTop1', top1.avg, step)
+            # summary_writer.add_scalar('Train/AvgTop5', top5.avg, step)
+            # summary_writer.add_scalar('Train/LearningRate', lr, step)
 
         timer['statistics'] += timetracker.split_time()
 
@@ -178,9 +178,8 @@ if __name__ == '__main__':
         plan="synergy_matrix")
 
     ntu_dataloader = DataLoader(ntu_dataset, batch_size=n_batch_size, shuffle=True)
-    get_pair = get_pairs()
+    get_pair = Pairs()
 
-    
     count = 0
     i = 0
     batch = None
@@ -193,7 +192,6 @@ if __name__ == '__main__':
     print(count)
     '''
 
-
     eval_interval = 5
     num_epoch = 100
     for epoch in range(num_epoch):
@@ -201,10 +199,6 @@ if __name__ == '__main__':
                 epoch + 1 == num_epoch)
 
         train(ntu_dataloader, epoch, pairs)
-        
-        
-        
-    
 
 '''
         if eval_model:
