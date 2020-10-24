@@ -1,8 +1,7 @@
 import os
 from abc import ABC
 
-# from prepare_ntu import *
-import prepare_ntu
+from .prepare_ntu import gendata, edge_index, data_sample
 import torch
 import torch.utils.data
 from torch_geometric.data import DataLoader
@@ -36,18 +35,8 @@ from torch_geometric.data import Dataset
  25-right thumb
 """
 
-
-# edge index is based on the list above
-edge_index = torch.tensor([(1, 2), (2, 21), (3, 21), (4, 3), (5, 21), (6, 5), (7, 6),
-                           (8, 7), (9, 21), (10, 9), (11, 10), (12, 11), (13, 1),
-                           (14, 13), (15, 14), (16, 15), (17, 1), (18, 17), (19, 18),
-                           (20, 19), (22, 23), (23, 8), (24, 25), (25, 12)], dtype=torch.long) - 1
-
 num_joint = 25
 
-
-# benchmark = ['cs', 'cv']
-# part = ['train', 'val']
 
 class NTUDataset(Dataset, ABC):
     def __init__(self,
@@ -70,7 +59,7 @@ class NTUDataset(Dataset, ABC):
         if not os.path.exists(self.out_path):
             os.makedirs(self.out_path)
 
-        self.rawFileNames = prepare_ntu.data_sample(
+        self.rawFileNames = data_sample(
             self.raw_path,
             self.out_path,
             ignored_sample_path=self.ignored_sample_path,
@@ -85,14 +74,13 @@ class NTUDataset(Dataset, ABC):
 
     @property
     def processed_file_names(self):
-
-        processedData = []
+        processed_data = []
         for i in range(len(self.rawFileNames[0])):
-            processedData.append('data_{}.pt'.format(i))
-        return processedData
+            processed_data.append('data_{}.pt'.format(i))
+        return processed_data
 
     def process(self):
-        prepare_ntu.gendata(
+        gendata(
             self.raw_path,
             self.out_path,
             ignored_sample_path=self.ignored_sample_path,
@@ -125,7 +113,7 @@ if __name__ == '__main__':
     count = 0
     i = 0
     batch = None
-    for b in (ntu_dataloader):
+    for b in ntu_dataloader:
         batch = b
         print('Index', count)
         print(len(batch))

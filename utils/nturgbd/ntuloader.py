@@ -1,5 +1,6 @@
 import os
 import pickle
+from abc import ABC
 
 import numpy as np
 from torch_geometric.data import Dataset
@@ -8,7 +9,7 @@ import utils
 from . import signals
 
 
-class NTULoader(Dataset):
+class NTULoader(Dataset, ABC):
     """ Dataset loader class for the NTURGB+D dataset
     Constructor arguments:
         split_dir (type string) ->
@@ -28,10 +29,11 @@ class NTULoader(Dataset):
     def __init__(self,
                  split_dir,
                  transforms=None,
-                 transform_args=dict(),
+                 transform_args=None,
                  is_training=True,
-                 signals=dict(),
+                 signals=None,
                  window_size=-1):
+        super(NTULoader, self).__init__()
         self.transforms = transforms
         self.split_dir = split_dir
         self.is_training = is_training
