@@ -41,11 +41,11 @@ class NTULoader(Dataset):
         self.temporal_signal = False
         self.spatial_signal = False
         self.all_signal = False
-        if 'temporal_signal' in signals.keys():
+        if (signals is not None) and ('temporal_signal' in signals.keys()):
             self.temporal_signal = signals['temporal_signal']
-        if 'spatial_signal' in signals.keys():
+        if (signals is not None) and ('spatial_signal' in signals.keys()):
             self.spatial_signal = signals['spatial_signal']
-        if 'all_signal' in signals.keys():
+        if (signals is not None) and ('all_signal' in signals.keys()):
             self.all_signal = signals['all_signal']
 
         if is_training:
@@ -105,18 +105,18 @@ class NTULoader(Dataset):
                 transform_args['sample'] = sample
 
         if self.all_signal:
-            disps = getattr(signals, 'displacementVectors')(sample=sample)
-            rel_coords = getattr(signals, 'relativeCoordinates')(sample=sample)
+            disps = getattr(signals, 'displacement_vectors')(sample=sample)
+            rel_coords = getattr(signals, 'relative_coordinates')(sample=sample)
             sample = np.concatenate([sample, disps, rel_coords], axis=0)
         elif self.temporal_signal and self.spatial_signal:
-            disps = getattr(signals, 'displacementVectors')(sample=sample)
-            rel_coords = getattr(signals, 'relativeCoordinates')(sample=sample)
+            disps = getattr(signals, 'displacement_vectors')(sample=sample)
+            rel_coords = getattr(signals, 'relative_coordinates')(sample=sample)
             sample = np.concatenate([disps, rel_coords], axis=0)
         elif self.temporal_signal:
-            disps = getattr(signals, 'displacementVectors')(sample=sample)
+            disps = getattr(signals, 'displacement_vectors')(sample=sample)
             sample = disps
         elif self.spatial_signal:
-            rel_coords = getattr(signals, 'relativeCoordinates')(sample=sample)
+            rel_coords = getattr(signals, 'relative_coordinates')(sample=sample)
             sample = rel_coords
 
         return sample, label
