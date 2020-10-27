@@ -1,7 +1,7 @@
 import os
 from abc import ABC
 
-from .prepare_ntu import gendata, edge_index, data_sample
+from prepare_ntu import gendata, edge_index, data_sample
 import torch
 import torch.utils.data
 from torch_geometric.data import DataLoader
@@ -101,7 +101,7 @@ if __name__ == '__main__':
 
     n_batch_size = 2
     ntu_dataset = NTUDataset(
-        "/home/cchenli/Documents/Apb-gcn/utils/nturgbd",
+        "/Users/yangzhiping/Documents/deepl/Apb-gcn/utils/nturgbd",
         batch_size=n_batch_size,
         benchmark='cv',
         part='val',

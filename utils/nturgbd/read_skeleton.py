@@ -73,9 +73,9 @@ def read_xyz(file, max_body=2, num_joint=25, plan = "synergy_matrix"):
                             data[4, n - 1, j, m] = torch.tensor(yzAngle)
                             data[5, n - 1, j, m] = torch.tensor(xzAngle)
                             data[6, n - 1, j, m] = torch.tensor(magnitude)
-                            data[7, n - 1, j, m] = torch.tensor(x)
-                            data[8, n - 1, j, m] = torch.tensor(y)
-                            data[9, n - 1, j, m] = torch.tensor(z)
+                            data[7, n - 1, j, m] = x
+                            data[8, n - 1, j, m] = y
+                            data[9, n - 1, j, m] = z
 
                         if plan == "transformer":    
                             # data[3:, n - 1, j, m] = [xyAngle, yzAngle, xzAngle, magnitude]

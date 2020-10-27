@@ -3,8 +3,8 @@ import os
 
 import numpy as np
 import torch
-from .pairs import Pairs
-from .read_skeleton import *
+from pairs import Pairs
+from read_skeleton import *
 from torch_geometric.data import Data
 from tqdm import tqdm
 
@@ -35,37 +35,36 @@ def gendata(data_path,
         benchmark,
         part)
     if plan == "synergy_matrix":
-        pyg_x = torch.zeros((num_joint, 10, max_frame, max_body, len(sample_name)))
+        pyg_x = torch.zeros((num_joint, 10, max_frame, max_body))
     if plan == "transformer":
-        pyg_x = torch.zeros((num_joint, 7, max_frame, max_body, len(sample_name)))
-    pyg_y = np.zeros(len(sample_name))
+        pyg_x = torch.zeros((num_joint, 7, max_frame, max_body))
 
     for i in tqdm(range(len(sample_name))):
         s = sample_name[i]
         data = read_xyz(os.path.join(data_path, s), plan=plan, max_body=max_body, num_joint=num_joint)
         modified_data = data.permute(2, 0, 1, 3)  # [max_frame,num_joint,num_features,max_body,clips]
-        pyg_x[:, :, 0:data.shape[1], :, i] = modified_data  # data
-        pyg_y[i] = sample_label[i]  # labels
-
-        graph = pyg_x[:, :, :, :, i]
-        get_pair = get_pairs()
-        synergy_matrix_1 = torch.zeros(0, 300)
-        synergy_matrix_2 = torch.zeros(0, 300)
-        for joint_1, joint_2 in get_pair.total_collection:
-            # pair : (joint 1, joint 2)
-            pair_synergy = torch.mul(graph[joint_1][7], graph[joint_2][7]) + torch.mul(graph[joint_1][8],
-                                                                                       graph[joint_2][8]) + torch.mul(
-                graph[joint_1][9], graph[joint_2][9])
-            pair_synergy_person_1 = torch.unsqueeze(pair_synergy.permute(1, 0)[0], 0)
-            pair_synergy_person_2 = torch.unsqueeze(pair_synergy.permute(1, 0)[1], 0)
-            synergy_matrix_1 = torch.cat((synergy_matrix_1, pair_synergy_person_1))
-            synergy_matrix_2 = torch.cat((synergy_matrix_2, pair_synergy_person_2))
-
-        pyg_data = Data(x=pyg_x[:, :, :, :, i], edge_index=edge_index.t().contiguous(), y=pyg_y[i])
+        pyg_x[:, :, 0:data.shape[1], : ] = modified_data  # data
 
         if plan == "synergy_matrix":
-            pyg_data = Data(x=torch.stack((synergy_matrix_1, synergy_matrix_2)), edge_index=edge_index.t().contiguous(),
-                            y=pyg_y[i])
+            get_pair = Pairs()
+            synergy_matrix_1 = torch.zeros(0, 300)
+            synergy_matrix_2 = torch.zeros(0, 300)
+            for joint_1, joint_2 in get_pair.total_collection:
+                # pair : (joint 1, joint 2)
+                pair_synergy = torch.mul(pyg_x[joint_1][7], pyg_x[joint_2][7]) + torch.mul(pyg_x[joint_1][8],
+                                                                                        pyg_x[joint_2][8]) + torch.mul(
+                    pyg_x[joint_1][9], pyg_x[joint_2][9])
+                pair_synergy_person_1 = torch.unsqueeze(pair_synergy.permute(1, 0)[0], 0)
+                pair_synergy_person_2 = torch.unsqueeze(pair_synergy.permute(1, 0)[1], 0)
+                synergy_matrix_1 = torch.cat((synergy_matrix_1, pair_synergy_person_1))
+                synergy_matrix_2 = torch.cat((synergy_matrix_2, pair_synergy_person_2))
+
+        if plan != "synergy_matrix":
+            pyg_data = Data(x=pyg_x, edge_index=edge_index.t().contiguous(), y=sample_label[i])
+
+        if plan == "synergy_matrix":
+            pyg_data = Data(x=torch.unsqueeze(torch.stack((synergy_matrix_1, synergy_matrix_2)), 0), edge_index=edge_index.t().contiguous(),
+                            y=sample_label[i])
         torch.save(pyg_data, os.path.join(out_path, 'data_{}.pt'.format(i)))
 
 

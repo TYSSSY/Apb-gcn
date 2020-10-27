@@ -1,12 +1,12 @@
 # from __future__ import print_function
 import torchvision.models as models
-from .pairs import *
+from pairs import *
 import os
 import glob
-from .ntu_pyg import *
+from ntu_pyg import *
 
 import numpy as np
-from .synergy import to_synergy_matrix
+from synergy import to_synergy_matrix
 
 import torch
 import torch.nn as nn
@@ -77,7 +77,7 @@ def adjust_learning_rate(epoch):
         raise ValueError()
 
 
-def top_k(self, score, label, top_k):
+def top_k(score, label, top_k):
     rank = score.argsort()
     hit_top_k = [l in rank[i, -top_k:] for i, l in enumerate(label)]
     return sum(hit_top_k) * 1.0 / len(hit_top_k)
@@ -89,7 +89,7 @@ def train(train_loader, epoch, pairs):
     top5 = AverageMeter()
 
     logdir = os.path.join("/home/lawbuntu/Documents/Workspace/Apb-gcn/utils/nturgbd", 'runs')
-    mobilenet = models.mobilenet_v2()
+    mobilenet = Net_one()
 
     mobilenet.train()
     print('Training epoch: {}'.format(epoch + 1))
@@ -101,7 +101,7 @@ def train(train_loader, epoch, pairs):
 
     optimizer = optim.Adam(
         mobilenet.parameters(),
-        lr=10 ** (-6),
+        lr=10 ** (-4),
         weight_decay=0.001)
     # summary_writer = SummaryWriter(logdir=logdir)
     log_interval = 100
@@ -115,15 +115,14 @@ def train(train_loader, epoch, pairs):
             label, requires_grad=False)
         timer['dataloader'] += timetracker.split_time()
 
-        matrix1, matrix2 = to_synergy_matrix(data, pairs)  # matrix.shape [batch_size, pair_nums, 300]
-
+        
+        optimizer.zero_grad()
         # forward
-        output = mobilenet(matrix1)
-        loss = nn.CrossEntropyLoss(output, label)
+        output = mobilenet(data)
+        criterion = nn.CrossEntropyLoss()
+        loss = criterion(output, label.long())
 
         # backward
-
-        optimizer.zero_grad()
         loss.backward()
         optimizer.step()
         loss_value.append(loss.item())
@@ -170,7 +169,7 @@ if __name__ == '__main__':
 
     n_batch_size = 2
     ntu_dataset = NTUDataset(
-        "/home/cchenli/Documents/Apb-gcn/utils/nturgbd",
+        "/Users/yangzhiping/Documents/deepl/Apb-gcn/utils/nturgbd",
         batch_size=n_batch_size,
         benchmark='cv',
         part='val',

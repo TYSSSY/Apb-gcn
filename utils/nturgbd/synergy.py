@@ -1,5 +1,5 @@
-from utils.nturgbd.ntu_pyg import NTUDataset
-from .ntu_pyg import *
+from ntu_pyg import NTUDataset
+from ntu_pyg import *
 
 
 def to_synergy_matrix(batch, pairs):
