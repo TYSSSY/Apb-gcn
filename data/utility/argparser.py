@@ -115,6 +115,11 @@ class Parser(object):
             default=[],
             nargs='+',
             help='The name of weights which will be ignored in the initialization')
+        self.parser.add_argument(
+            '--plan',
+            type=str,
+            default="synergy_matrix",
+            help="indicate which plan to use")
 
         # Optimization
         self.parser.add_argument(

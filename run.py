@@ -48,9 +48,11 @@ class Runner(object):
         self.load_model()
         self.load_optimizer()
         self.best_valid = []
+        self.plan = args.plan
 
     def load_data(self):
         if 'NTU' in self.args.dataset:
+            '''
             if self.args.phase == 'train':
                 self.train_dataset = getattr(data, self.args.loader)(**self.args.train_loader_args)
                 self.train_loader = DataLoader(self.train_dataset,
@@ -60,6 +62,16 @@ class Runner(object):
             self.test_loader = DataLoader(self.test_dataset,
                 batch_size=self.args.batch_size, shuffle=False,
                 num_workers=self.args.num_workers, pin_memory=True)
+            '''
+            if self.args.phase == 'train':
+                self.train_dataset = NTUDataset(
+                    self.root,
+                    batch_size=self.args.batch_size,
+                    benchmark='cv',
+                    part='val',
+                    ignored_sample_path=None,
+                    plan=self.plan)
+
         elif 'HDM' in self.args.dataset:
             st = np.random.get_state()
             extra_arg = dict(random_state=st)
@@ -319,6 +331,7 @@ if __name__ == '__main__':
     args = p.parser.parse_args()
     p.dump_args(args, args.work_dir)
 
+    '''
     if 'HDM' in args.dataset:
         # Prepare the data if not already present
         # No splits => prepared at runtime
@@ -385,6 +398,7 @@ if __name__ == '__main__':
                 benchmark=benchmark,
                 part=part
             )
+    '''
 
         # Launch the training process
         launcher = Runner(args)

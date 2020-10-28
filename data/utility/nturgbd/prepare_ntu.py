@@ -3,8 +3,8 @@ import os
 
 import numpy as np
 import torch
-from pairs import Pairs
-from read_skeleton import *
+from utility.nturgbd.pairs import Pairs
+from utility.nturgbd.read_skeleton import *
 from torch_geometric.data import Data
 from tqdm import tqdm
 

@@ -1,7 +1,7 @@
 import os
 from abc import ABC
-
-from prepare_ntu import gendata, edge_index, data_sample
+import sys
+from utility.nturgbd.prepare_ntu import gendata, edge_index, data_sample
 import torch
 import torch.utils.data
 from torch_geometric.data import DataLoader
@@ -54,10 +54,7 @@ class NTUDataset(Dataset, ABC):
         self.benchmark = benchmark
         self.part = part
         self.plan = plan
-        self.out_path = os.path.join(os.path.join(root, 'processed'), self.benchmark, self.part)
-
-        if not os.path.exists(self.out_path):
-            os.makedirs(self.out_path)
+        self.out_path = os.path.join(root, 'processed', self.plan, self.benchmark, self.part)
 
         self.rawFileNames = data_sample(
             self.raw_path,
@@ -80,13 +77,15 @@ class NTUDataset(Dataset, ABC):
         return processed_data
 
     def process(self):
-        gendata(
-            self.raw_path,
-            self.out_path,
-            ignored_sample_path=self.ignored_sample_path,
-            benchmark=self.benchmark,
-            part=self.part,
-            plan=self.plan)
+        if not os.path.exists(self.out_path):
+            os.makedirs(self.out_path)
+            gendata(
+                self.raw_path,
+                self.out_path,
+                ignored_sample_path=self.ignored_sample_path,
+                benchmark=self.benchmark,
+                part=self.part,
+                plan=self.plan)
 
     def len(self):
         return len(self.raw_paths)
@@ -101,7 +100,7 @@ if __name__ == '__main__':
 
     n_batch_size = 2
     ntu_dataset = NTUDataset(
-        "/Users/yangzhiping/Documents/deepl/Apb-gcn/utils/nturgbd",
+        "/Users/yangzhiping/Documents/deepl/Apb-gcn/data/utility/nturgbd",
         batch_size=n_batch_size,
         benchmark='cv',
         part='val',
