@@ -22,7 +22,9 @@ joint_info_key = ['x', 'y', 'z',
                   ]
 
 
-def process_skeleton(path, num_features):
-    skeleton_sequence = {}
+def process_skeleton(path, num_joints=25, num_features=3):
     with open(path, 'r') as f:
-        skeleton_sequence['numFrame'] = int(f.readline())
+        num_frames = int(f.readline())
+        skeleton_sequence = {'numFrame': num_frames}
+        frames, frames_ = [], []
+

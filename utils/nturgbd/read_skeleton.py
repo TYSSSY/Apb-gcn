@@ -5,13 +5,10 @@ import numpy as np
 
 def read_skeleton(file):
     with open(file, 'r') as f:
-        skeleton_sequence = {}
-        skeleton_sequence['numFrame'] = int(f.readline())
-        skeleton_sequence['frameInfo'] = []
+        skeleton_sequence = {'numFrame': int(f.readline()), 'frameInfo': []}
         for t in range(skeleton_sequence['numFrame']):
             frame_info = {'numBody': int(f.readline()), 'bodyInfo': []}
             for m in range(frame_info['numBody']):
-                body_info = {}
                 body_info_key = [
                     'bodyID', 'clipedEdges', 'handLeftConfidence',
                     'handLeftState', 'handRightConfidence', 'handRightState',
