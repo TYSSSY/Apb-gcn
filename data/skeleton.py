@@ -24,7 +24,28 @@ joint_info_key = ['x', 'y', 'z',
 
 def process_skeleton(path, num_joints=25, num_features=3):
     with open(path, 'r') as f:
-        num_frames = int(f.readline())
+        lines = f.readlines()
+        num_frames = int(lines[0])
+        start = 1
         skeleton_sequence = {'numFrame': num_frames}
-        frames, frames_ = [], []
+        # frames, frames_ = torch.zeros((num_frames, num_joints, num_features)), None
+        num_persons = int(lines[1])
+        offset = int((len(lines) - 1) / num_frames)
+        frames = [lines[start + 3 + i * offset:
+                        start + 3 + i * offset + num_joints] for i in range(num_frames)]
+        frames = process_frames(frames, num_joints, num_features)
+        if num_persons == 2:
+            frames_ = [lines[start + (i + 1) * offset - num_joints:
+                             start + (i + 1) * offset + num_joints] for i in range(num_frames)]
+            frames_ = process_frames(frames_, num_joints, num_features)
+        else:
+            frames_ = []
+
+        return frames, frames_
+
+
+def process_frames(frames, num_joints, num_features):
+    fv = torch.zeros((len(frames), num_joints, num_features))
+    for f in frames:
+        pass
 

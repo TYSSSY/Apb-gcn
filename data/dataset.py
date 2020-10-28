@@ -57,7 +57,7 @@ class SkeletonDataset(Dataset, ABC):
                             self.processed_file_names))
 
     def len(self):
-        return len(self.processed_file_names)
+        return len(self.data)
 
     def get(self, idx):
         data = torch.load(osp.join(self.processed_dir, 'data_{}.pt'.format(idx)))
