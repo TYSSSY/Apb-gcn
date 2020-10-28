@@ -1,13 +1,12 @@
 import os
-import time
-import numpy as np
 import pickle
 
-from torch.autograd import Variable
+import numpy as np
 from torch.utils.data.dataset import Dataset
 
 import utils
 from . import signals
+
 
 def split_augment_data(data):
     validFrames = (sample != 0).sum(axis=3).sum(axis=2).sum(axis=0) > 0
@@ -24,16 +23,17 @@ def split_augment_data(data):
     for n in range(8):
         seq = []
         for i in range(num_chunks):
-            if i == num_chunks-1:
+            if i == num_chunks - 1:
                 frame_idx = np.random.randint(0, last_chunk_size, 1)
             else:
                 frame_idx = np.random.randint(0, 8, 1)
-            seq.append(data[:, i*8+frame_idx, :, :])
+            seq.append(data[:, i * 8 + frame_idx, :, :])
 
         seq = np.concatenate(seq, axis=1)
         sequences[n, :, :num_chunks, :, :] = seq
 
     return sequences
+
 
 class HDM05Loader(Dataset):
     """ Dataset loader class for the NTURGB+D dataset
@@ -51,9 +51,10 @@ class HDM05Loader(Dataset):
         window_size (type int) ->
             The number of frames in each sample to be loaded
     """
+
     def __init__(self,
                  split_dir,
-                 split_name='csub',       # or 10csam
+                 split_name='csub',  # or 10csam
                  transforms=None,
                  transform_args=dict(),
                  is_training=True,
@@ -119,8 +120,8 @@ class HDM05Loader(Dataset):
                 class_idx = np.where(np.isin(self.labels, i))
                 num_idx = len(class_idx[0])
                 add = num_idx % 2
-                train_idx.extend(class_idx[0][:num_idx//2+add])
-                test_idx.extend(class_idx[0][num_idx//2+add:])
+                train_idx.extend(class_idx[0][:num_idx // 2 + add])
+                test_idx.extend(class_idx[0][num_idx // 2 + add:])
 
             if is_training:
                 train_idx = np.asarray(train_idx)
@@ -148,7 +149,7 @@ class HDM05Loader(Dataset):
         N, C, T, V, M = data.shape
         self.mean_map = data.mean(
             axis=2, keepdims=True).mean(
-                axis=4, keepdims=True).mean(axis=0)
+            axis=4, keepdims=True).mean(axis=0)
         self.std_map = data.transpose((0, 2, 4, 1, 3)).reshape(
             (N * T * M, C * V)).std(axis=0).reshape((C, 1, V, 1))
 
@@ -183,8 +184,8 @@ class HDM05Loader(Dataset):
             rel_coords = getattr(signals, 'relative_coordinates')(sample=sample)
             sample = rel_coords
 
-        #sample = split_augment_data(sample)
-        #label = np.asarray([label] * 8)
+        # sample = split_augment_data(sample)
+        # label = np.asarray([label] * 8)
 
         return sample, label
 
