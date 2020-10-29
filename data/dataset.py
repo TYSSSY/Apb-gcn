@@ -2,11 +2,12 @@ from abc import ABC
 
 import os
 import os.path as osp
+from time import sleep
 
 import torch
 from torch_geometric.data import Dataset, Data
 from tqdm import tqdm
-from .skeleton import process_skeleton
+from .skeleton import process_skeleton, skeleton_parts
 
 
 class SkeletonDataset(Dataset, ABC):
@@ -16,6 +17,9 @@ class SkeletonDataset(Dataset, ABC):
             self.num_joints = 25
         else:
             self.num_joints = 31
+
+        self.skeleton_ = skeleton_parts()
+
         if not osp.exists(osp.join(root, "raw")):
             os.mkdir(osp.join(root, "raw"))
         super(Dataset, self).__init__(root, transform, pre_transform)
@@ -35,12 +39,14 @@ class SkeletonDataset(Dataset, ABC):
         pass
 
     def process(self):
-        fs = self.raw_file_names
-        progress_bar = tqdm(fs)
-        skeletons, labels = [], []
+        progress_bar = tqdm(self.raw_file_names)
+        skeletons, labels = [], torch.zeros(len(self.raw_file_names))
+        i = 0
         for f in progress_bar:
             # Read data from `raw_path`.
-            data = Data(...)
+            sleep(1e-4)
+            progress_bar.set_description("processing %s" % f)
+            data, label = process_skeleton(f, self.num_joints)
 
             if self.pre_filter is not None and not self.pre_filter(data):
                 continue
@@ -48,9 +54,9 @@ class SkeletonDataset(Dataset, ABC):
             if self.pre_transform is not None:
                 data = self.pre_transform(data)
 
-            data, label = process_skeleton(f, self.num_joints)
             skeletons.append(data)
-            labels.append(label)
+            labels[i] = label
+            i += 1
 
         torch.save([skeletons, labels],
                    osp.join(self.processed_dir,
@@ -60,5 +66,4 @@ class SkeletonDataset(Dataset, ABC):
         return len(self.data)
 
     def get(self, idx):
-        data = torch.load(osp.join(self.processed_dir, 'data_{}.pt'.format(idx)))
-        return data
+        return self.data[idx]
