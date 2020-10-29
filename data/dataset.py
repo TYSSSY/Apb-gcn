@@ -11,7 +11,12 @@ from .skeleton import process_skeleton, skeleton_parts
 
 
 class SkeletonDataset(Dataset, ABC):
-    def __init__(self, root, name, transform=None, pre_transform=None):
+    def __init__(self,
+                 root,
+                 name,
+                 use_motion_vector=False,
+                 transform=None,
+                 pre_transform=None):
         self.name = name
         if 'ntu' in name:
             self.num_joints = 25
@@ -19,6 +24,7 @@ class SkeletonDataset(Dataset, ABC):
             self.num_joints = 31
 
         self.skeleton_ = skeleton_parts()
+        self.use_motion_vector = use_motion_vector
 
         if not osp.exists(osp.join(root, "raw")):
             os.mkdir(osp.join(root, "raw"))
@@ -46,7 +52,9 @@ class SkeletonDataset(Dataset, ABC):
             # Read data from `raw_path`.
             sleep(1e-4)
             progress_bar.set_description("processing %s" % f)
-            data, label = process_skeleton(f, self.num_joints)
+            data, label = process_skeleton(f,
+                                           self.num_joints,
+                                           use_motion_vector=self.use_motion_vector)
 
             if self.pre_filter is not None and not self.pre_filter(data):
                 continue

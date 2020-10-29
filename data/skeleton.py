@@ -13,7 +13,10 @@ def skeleton_parts(num_joints=25):
                       power_adj(sk_adj, max(num_joints, max(sk_adj[1]) + 1), 3)], dim=1)
 
 
-def process_skeleton(path, num_joints=25, num_features=3):
+def process_skeleton(path,
+                     num_joints=25,
+                     num_features=3,
+                     use_motion_vector=False):
     import os.path as osp
     t = osp.split(path)[-1][-12:-9]
     with open(path, 'r') as f:
@@ -24,7 +27,7 @@ def process_skeleton(path, num_joints=25, num_features=3):
         offset = int((len(lines) - 1) / num_frames)
         frames = [lines[start + 3 + i * offset:
                         start + 3 + i * offset + num_joints] for i in range(num_frames)]
-        frames = process_frames(frames, num_joints, num_features)
+        frames = process_frames(frames, num_joints, num_features, use_motion_vector)
         if num_persons == 2:
             frames_ = [lines[start + (i + 1) * offset - num_joints:
                              start + (i + 1) * offset + num_joints] for i in range(num_frames)]
@@ -33,13 +36,19 @@ def process_skeleton(path, num_joints=25, num_features=3):
         return frames, int(t)
 
 
-def process_frames(frames, num_joints, num_features=3):
+def motion_vector(vec):
+    return
+
+
+def process_frames(frames, num_joints, num_features, use_motion_vector=False):
     fv = torch.zeros((len(frames), num_joints, num_features))
     for i in range(len(frames)):
         f = frames[i]
         for j in range(num_joints):
-            vs = [float(n) for n in f[j].split()]
-            fv[i, j, :] = torch.tensor(vs[0: num_features])
+            vs = [float(n) for n in f[j].split()][0: num_features]
+            if use_motion_vector:
+                vs += motion_vector(vs)
+            fv[i, j, :] = torch.tensor(vs)
     return fv
 
 
