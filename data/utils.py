@@ -1,5 +1,6 @@
 import numpy as np
 
+
 def RandomTemporalCrop(**kwargs):
     sample = kwargs['sample']
     size = kwargs['window_size']
@@ -11,6 +12,7 @@ def RandomTemporalCrop(**kwargs):
     else:
         start = np.random.randint(T - size)
         return sample[:, start:start + size, :, :]
+
 
 def RandomTemporalSampling(**kwargs):
     sample = kwargs['sample']
@@ -24,6 +26,7 @@ def RandomTemporalSampling(**kwargs):
     idx = np.random.choice(T, num_samples, replace=False)
     return sample[:, idx, :, :]
 
+
 def PadSequence(**kwargs):
     sample = kwargs['sample']
     size = kwargs['size']
@@ -34,8 +37,9 @@ def PadSequence(**kwargs):
         padedSample = np.zeros((C, size, V, M))
         padedSample[:, :T, :, :] = sample
         return padedSample
-    
+
     return sample
+
 
 '''
 angle_choices=[-10., -5., 0, 5., 10.],
@@ -43,6 +47,8 @@ scale_choices=[0.9, 1.0, 1.1],
 translate_choices=[-0.2, -0.1, 0.0, 0.1, 0.2],
 tsmoothness_choices=[1]
 '''
+
+
 def RandomAffineTransformAcrossTime(**kwargs):
     sample = kwargs['sample']
     angle_choices = kwargs['angle_choices']
@@ -68,26 +74,26 @@ def RandomAffineTransformAcrossTime(**kwargs):
     yTranslatePerTimeInstant = np.zeros(T)
 
     for i in range(numChanges - 1):
-        anglePerTimeInstant[timeInstantsOfChange[i] : timeInstantsOfChange[i+1]] = np.linspace(
-            chosenAngles[i], chosenAngles[i+1],
-            timeInstantsOfChange[i+1] - timeInstantsOfChange[i]) * np.pi / 180
+        anglePerTimeInstant[timeInstantsOfChange[i]: timeInstantsOfChange[i + 1]] = np.linspace(
+            chosenAngles[i], chosenAngles[i + 1],
+            timeInstantsOfChange[i + 1] - timeInstantsOfChange[i]) * np.pi / 180
 
-        scalePerTimeInstant[timeInstantsOfChange[i] : timeInstantsOfChange[i+1]] = np.linspace(
-            chosenScales[i], chosenScales[i+1],
-            timeInstantsOfChange[i+1] - timeInstantsOfChange[i])
+        scalePerTimeInstant[timeInstantsOfChange[i]: timeInstantsOfChange[i + 1]] = np.linspace(
+            chosenScales[i], chosenScales[i + 1],
+            timeInstantsOfChange[i + 1] - timeInstantsOfChange[i])
 
-        xTranslatePerTimeInstant[timeInstantsOfChange[i] : timeInstantsOfChange[i+1]] = np.linspace(
-            chosenTranslateX[i], chosenTranslateX[i+1],
-            timeInstantsOfChange[i+1] - timeInstantsOfChange[i])
+        xTranslatePerTimeInstant[timeInstantsOfChange[i]: timeInstantsOfChange[i + 1]] = np.linspace(
+            chosenTranslateX[i], chosenTranslateX[i + 1],
+            timeInstantsOfChange[i + 1] - timeInstantsOfChange[i])
 
-        yTranslatePerTimeInstant[timeInstantsOfChange[i] : timeInstantsOfChange[i+1]] = np.linspace(
-            chosenTranslateY[i], chosenTranslateY[i+1],
-            timeInstantsOfChange[i+1] - timeInstantsOfChange[i])
+        yTranslatePerTimeInstant[timeInstantsOfChange[i]: timeInstantsOfChange[i + 1]] = np.linspace(
+            chosenTranslateY[i], chosenTranslateY[i + 1],
+            timeInstantsOfChange[i + 1] - timeInstantsOfChange[i])
 
     theta = np.array([[np.cos(anglePerTimeInstant) * scalePerTimeInstant,
-                        -np.sin(anglePerTimeInstant) * scalePerTimeInstant],
+                       -np.sin(anglePerTimeInstant) * scalePerTimeInstant],
                       [np.sin(anglePerTimeInstant) * scalePerTimeInstant,
-                        np.cos(anglePerTimeInstant) * scalePerTimeInstant]])
+                       np.cos(anglePerTimeInstant) * scalePerTimeInstant]])
 
     # Carry out the affine transformations
     for idx in range(T):
@@ -98,6 +104,7 @@ def RandomAffineTransformAcrossTime(**kwargs):
         sample[0:2, idx, :, :] = new_xy.reshape(2, V, M)
 
     return sample
+
 
 def RandomTemporalShift(**kwargs):
     sample = kwargs['sample']
@@ -110,15 +117,18 @@ def RandomTemporalShift(**kwargs):
 
     size = end - start
     randomStart = np.random.randint(0, T - size)
-    shiftedSample[:, randomStart:randomStart+size, :, :] = sample[:, start:end, :, :]
+    shiftedSample[:, randomStart:randomStart + size, :, :] = sample[:, start:end, :, :]
 
     return shiftedSample
+
 
 '''
 mean_choices=[0., -0.1, 0.1]
 sigma_choices=[0.1, 0.2]
 noise_level_choices=[0.002, 0.004, 0.005]
 '''
+
+
 def RandomGaussianNoise(**kwargs):
     sample = kwargs['sample']
     noise_level_choices = kwargs['noise_level_choices']

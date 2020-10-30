@@ -1,11 +1,11 @@
 import numpy as np
-import os
 from scipy.io import loadmat
+
 
 def read_skeleton(file):
     matx = loadmat(file)['mot']
     skeleton_sequence = {}
-    skeleton_sequence['numFrame'] = matx['jointTrajectories'][0,0][0,0].shape[1]
+    skeleton_sequence['numFrame'] = matx['jointTrajectories'][0, 0][0, 0].shape[1]
     skeleton_sequence['frameInfo'] = []
     for t in range(skeleton_sequence['numFrame']):
         frame_info = {}
@@ -13,7 +13,7 @@ def read_skeleton(file):
         frame_info['bodyInfo'] = []
         for m in range(frame_info['numBody']):
             body_info = {}
-            body_info['numJoint'] = matx['jointTrajectories'][0,0][:,m].shape[0]
+            body_info['numJoint'] = matx['jointTrajectories'][0, 0][:, m].shape[0]
             body_info['jointInfo'] = []
             for v in range(body_info['numJoint']):
                 joint_info_key = [
@@ -21,7 +21,7 @@ def read_skeleton(file):
                 ]
                 joint_info = {
                     k: float(v)
-                    for k, v in zip(joint_info_key, matx['jointTrajectories'][0,0][:,m][v][:,t])
+                    for k, v in zip(joint_info_key, matx['jointTrajectories'][0, 0][:, m][v][:, t])
                 }
                 body_info['jointInfo'].append(joint_info)
             frame_info['bodyInfo'].append(body_info)

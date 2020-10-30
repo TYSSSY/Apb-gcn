@@ -1,9 +1,9 @@
-import os
+import argparse
 import glob
+import os
 import pickle
 from itertools import groupby
 
-import argparse
 from numpy.lib.format import open_memmap
 from tqdm import tqdm
 
@@ -12,6 +12,7 @@ from .read_skeleton import read_xyz
 max_body = 1
 num_joint = 31
 max_frame = 901
+
 
 def gendata(data_path,
             out_path):

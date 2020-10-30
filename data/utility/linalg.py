@@ -125,3 +125,11 @@ def to_band_sparse(x, lower=True):
         indices = indices[:, t]
     b = x.view(-1, torch.prod(torch.tensor(x.shape[-2:])))
     return indices, b[:, 0: indices.shape[-1]]
+
+
+if __name__ == "__main__":
+    sk_adj = torch.tensor([
+        [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 21, 22, 23, 24],
+        [1, 20, 20, 2, 20, 4, 5, 6, 20, 8, 9, 10, 0, 12, 13, 14, 0, 16, 17, 18, 22, 7, 24, 11]])
+    sk = power_adj(sk_adj, max(25, max(sk_adj[1]) + 1), 2)
+    sk3 = power_adj(sk_adj, max(25, max(sk_adj[1]) + 1), 3)
