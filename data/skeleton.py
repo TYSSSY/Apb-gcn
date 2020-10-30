@@ -6,8 +6,8 @@ from utils.linalg import power_adj
 
 def skeleton_parts(num_joints=25):
     sk_adj = torch.tensor([
-        [0,  1,  2,  3,  4,  5,  6,  7,  8,  9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 21, 22, 23, 24],
-        [1, 20, 20,  2, 20,  4,  5,  6, 20,  8,  9, 10,  0, 12, 13, 14,  0, 16, 17, 18, 22,  7, 24, 11]])
+        [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 21, 22, 23, 24],
+        [1, 20, 20, 2, 20, 4, 5, 6, 20, 8, 9, 10, 0, 12, 13, 14, 0, 16, 17, 18, 22, 7, 24, 11]])
     return torch.cat([sk_adj,
                       power_adj(sk_adj, max(num_joints, max(sk_adj[1]) + 1), 2),
                       power_adj(sk_adj, max(num_joints, max(sk_adj[1]) + 1), 3)], dim=1)
@@ -36,8 +36,14 @@ def process_skeleton(path,
         return frames, int(t)
 
 
-def motion_vector(vec):
-    return
+def motion_vector(frames):
+    # dimensions: num_frames num_joints num_features (x, y, z)
+    mgd = torch.sqrt(torch.sum(torch.square(frames), dim=2))  # Magnitude
+    mv = torch.zeros(frames.shape)
+    mv[1:, :, :] = frames[1:, :, :] - frames[0: -1, :, :]
+    mv = torch.div(mv.view(-1, 3), mgd.view(-1, 1)).view(frames.shape)
+    mv = torch.acos(mv[:, :, [2, 0, 1]])  # switch the order to {z, x, y} before applying acos
+    return mv
 
 
 def process_frames(frames, num_joints, num_features, use_motion_vector=False):
@@ -46,9 +52,7 @@ def process_frames(frames, num_joints, num_features, use_motion_vector=False):
         f = frames[i]
         for j in range(num_joints):
             vs = [float(n) for n in f[j].split()][0: num_features]
-            if use_motion_vector:
-                vs += motion_vector(vs)
             fv[i, j, :] = torch.tensor(vs)
+    if use_motion_vector:
+        fv = torch.cat([fv, motion_vector(fv)], dim=-1)
     return fv
-
-

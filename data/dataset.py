@@ -61,7 +61,7 @@ class SkeletonDataset(Dataset, ABC):
 
             if self.pre_transform is not None:
                 data = self.pre_transform(data)
-
+            # data = Data(x=data, edge_index=self.skeleton_)
             skeletons.append(data)
             labels[i] = label
             i += 1
