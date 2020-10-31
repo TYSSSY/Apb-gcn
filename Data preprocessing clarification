@@ -33,7 +33,7 @@ functions:
 =================================================                        
 (outside class):
 parameters:
-          - data_path(string): input data path, fixed to be "root/raw" (need to artifically create the directory).
+          - data_path(string): input data path, fixed to be "root/raw" (need to artificially create the directory).
           
           - out_path(string): output data path, fixed to be "root/processed" (automatically create the directory).
           
