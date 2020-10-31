@@ -31,7 +31,7 @@ def process_skeleton(path,
         if num_persons == 2:
             frames_ = [lines[start + (i + 1) * offset - num_joints:
                              start + (i + 1) * offset + num_joints] for i in range(num_frames)]
-            frames_ = process_frames(frames_, num_joints, num_features)
+            frames_ = process_frames(frames_, num_joints, num_features, use_motion_vector)
             frames = torch.cat([frames, frames_], dim=0)
         return frames, int(t)
 
@@ -42,7 +42,9 @@ def motion_vector(frames):
     mv = torch.zeros(frames.shape)
     mv[1:, :, :] = frames[1:, :, :] - frames[0: -1, :, :]
     mv = torch.div(mv.view(-1, 3), mgd.view(-1, 1)).view(frames.shape)
-    mv = torch.acos(mv[:, :, [2, 0, 1]])  # switch the order to {z, x, y} before applying acos
+    # switch the order to {z, x, y} before applying acos
+    mv = torch.cat([torch.acos(mv[:, :, [2, 0, 1]]),
+                    torch.unsqueeze(mgd, dim=2)], dim=-1)
     return mv
 
 

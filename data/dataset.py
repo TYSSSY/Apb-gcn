@@ -7,14 +7,14 @@ from time import sleep
 import torch
 from torch_geometric.data import Dataset, Data
 from tqdm import tqdm
-from .skeleton import process_skeleton, skeleton_parts
+from data.skeleton import process_skeleton, skeleton_parts
 
 
 class SkeletonDataset(Dataset, ABC):
     def __init__(self,
                  root,
                  name,
-                 use_motion_vector=False,
+                 use_motion_vector=True,
                  transform=None,
                  pre_transform=None):
         self.name = name
@@ -28,13 +28,13 @@ class SkeletonDataset(Dataset, ABC):
 
         if not osp.exists(osp.join(root, "raw")):
             os.mkdir(osp.join(root, "raw"))
-        super(Dataset, self).__init__(root, transform, pre_transform)
+        super(SkeletonDataset, self).__init__(root, transform, pre_transform)
         path = osp.join(self.processed_dir, self.processed_file_names)
         self.data, self.labels = torch.load(path)
 
     @property
     def raw_file_names(self):
-        return [f for f in os.listdir(self.raw_dir)]
+        return [osp.join(self.root, 'raw', f) for f in os.listdir(self.raw_dir)]
 
     @property
     def processed_file_names(self):
@@ -75,3 +75,12 @@ class SkeletonDataset(Dataset, ABC):
 
     def get(self, idx):
         return self.data[idx]
+
+
+def test():
+    ds = SkeletonDataset(root='dataset',
+                         name='ntu')
+
+
+if __name__ == "__main__":
+    test()
