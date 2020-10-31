@@ -78,7 +78,7 @@ class SkeletonDataset(Dataset, ABC):
 
 
 def test():
-    ds = SkeletonDataset(root='dataset',
+    ds = SkeletonDataset(root='../dataset',
                          name='ntu')
 
 

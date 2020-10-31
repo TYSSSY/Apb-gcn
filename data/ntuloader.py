@@ -32,6 +32,8 @@ class NTULoader(Dataset):
                  is_training=True,
                  signals=None,
                  window_size=-1):
+        if signals is None:
+            signals = {}
         self.transforms = transforms
         self.split_dir = split_dir
         self.is_training = is_training
@@ -41,11 +43,11 @@ class NTULoader(Dataset):
         self.temporal_signal = False
         self.spatial_signal = False
         self.all_signal = False
-        if (signals is not None) and ('temporal_signal' in signals.keys()):
+        if 'temporal_signal' in signals.keys():
             self.temporal_signal = signals['temporal_signal']
-        if (signals is not None) and ('spatial_signal' in signals.keys()):
+        if 'spatial_signal' in signals.keys():
             self.spatial_signal = signals['spatial_signal']
-        if (signals is not None) and ('all_signal' in signals.keys()):
+        if 'all_signal' in signals.keys():
             self.all_signal = signals['all_signal']
 
         if is_training:
