@@ -28,9 +28,12 @@ from einops import rearrange
 
 
 class FastAttention(nn.Module, ABC):
-    def __init__(self, dim_heads, nb_features=None, redraw_projection=True, ortho_scaling=0, causal=False,
-                 generalized_attention=False, kernel_fn=nn.ReLU(), qr_uniform_q=False):
-        super().__init__()
+    def __init__(self,
+                 dim_heads, nb_features=None,
+                 redraw_projection=True, ortho_scaling=0, causal=False,
+                 generalized_attention=False,
+                 kernel_fn=nn.ReLU(), qr_uniform_q=False):
+        super(FastAttention, self).__init__()
         nb_features = default(nb_features, int(dim_heads * math.log(dim_heads)))
 
         self.dim_heads = dim_heads

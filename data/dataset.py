@@ -20,8 +20,10 @@ class SkeletonDataset(Dataset, ABC):
         self.name = name
         if 'ntu' in name:
             self.num_joints = 25
-        else:
+        elif 'hdm' in name:
             self.num_joints = 31
+        else:
+            raise ValueError(self.name + " not supported")
 
         self.skeleton_ = skeleton_parts()
         self.use_motion_vector = use_motion_vector
@@ -35,7 +37,7 @@ class SkeletonDataset(Dataset, ABC):
     @property
     def raw_file_names(self):
         fp = lambda x: osp.join(self.root, 'raw', x)
-        return [fp(f) for f in os.listdir(self.raw_dir)]
+        return [fp(f) for f in os.listdir(self.raw_dir)]  # if osp.isfile(fp(f))]
 
     @property
     def processed_file_names(self):
