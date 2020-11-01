@@ -34,7 +34,8 @@ class SkeletonDataset(Dataset, ABC):
 
     @property
     def raw_file_names(self):
-        return [osp.join(self.root, 'raw', f) for f in os.listdir(self.raw_dir)]
+        fp = lambda x: osp.join(self.root, 'raw', x)
+        return [fp(f) for f in os.listdir(self.raw_dir)]
 
     @property
     def processed_file_names(self):
@@ -61,7 +62,7 @@ class SkeletonDataset(Dataset, ABC):
 
             if self.pre_transform is not None:
                 data = self.pre_transform(data)
-            # data = Data(x=data, edge_index=self.skeleton_)
+            data = Data(x=data, edge_index=self.skeleton_)
             skeletons.append(data)
             labels[i] = label
             i += 1
@@ -78,8 +79,12 @@ class SkeletonDataset(Dataset, ABC):
 
 
 def test():
+    from torch_geometric.data import DataLoader
     ds = SkeletonDataset(root='../dataset',
                          name='ntu')
+    loader = DataLoader(ds, batch_size=4)
+    for b in loader:
+        print(b.batch)
 
 
 if __name__ == "__main__":
