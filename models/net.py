@@ -4,6 +4,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as fn
 from .layers import HGAConv
+from .third_party.models import SelfAttention
 
 
 class DualGraphTransformer(nn.Module, ABC):
@@ -21,8 +22,8 @@ class DualGraphTransformer(nn.Module, ABC):
                     out_channels=channels[i + 1]) for i in range(num_layers)
         ])
         self.temporal_layers = nn.ModuleList([
-            HGAConv(in_channels=channels[i],
-                    out_channels=channels[i + 1]) for i in range(num_layers)
+            SelfAttention(dim=channels[i + 1],  # TODO ??? potential dimension problem
+                          nb_features=channels[i]) for i in range(num_layers)
         ])
         self.bottle_neck = nn.Linear(in_features=out_channels,
                                      out_features=out_channels)
