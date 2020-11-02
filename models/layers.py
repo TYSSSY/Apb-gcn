@@ -15,7 +15,7 @@ from torch_geometric.nn.inits import glorot, zeros
 from torch_geometric.utils import remove_self_loops, add_self_loops, softmax
 from einops import rearrange
 
-from utils.linalg import batched_spmm, batched_transpose, transpose_, masked_softmax, get_factorized_dim, to_band_sparse
+from utility.linalg import batched_spmm, batched_transpose, transpose_, masked_softmax, get_factorized_dim, to_band_sparse
 
 
 def clones(module, k):

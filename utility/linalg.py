@@ -23,8 +23,8 @@ def batched_spmm(nzt, adj, x, m=None, n=None):
         m:   int
         n:   int
     """
-    num_edges, heads = nzt.size()
-    num_nodes, channels = x.size()
+    num_edges, heads = nzt.shape[-2:]
+    num_nodes, channels = x.shape[-2:]
     # preparation of data
     x_ = torch.cat(heads * [x])  # duplicate x for heads times
     nzt_ = nzt.view(-1)
