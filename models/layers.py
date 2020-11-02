@@ -212,7 +212,12 @@ class HGAConv(MessagePassing):
 
     def _attention(self, adj, score):  # score: [num_edges, heads]
         alpha = fn.leaky_relu(score, self.negative_slope)
-        alpha = softmax(alpha, adj[1])
+        if len(alpha.shape) == 2:
+            alpha = softmax(alpha, adj[1])
+        else:
+            c = alpha.shape[-1]
+            al = softmax(rearrange(alpha, 'b n c -> n (b c)'), adj[1])
+            alpha = rearrange(al, 'n (b c) -> b n c', c=c)
         self._alpha = alpha
         return fn.dropout(alpha, p=self.dropout, training=self.training)
 
