@@ -1,10 +1,9 @@
 from abc import ABC
 
-import torch
 import torch.nn as nn
 import torch.nn.functional as fn
 from .layers import HGAConv
-from .third_party.models import SelfAttention
+from third_party.models import SelfAttention
 
 
 class DualGraphTransformer(nn.Module, ABC):

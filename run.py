@@ -1,27 +1,28 @@
 from __future__ import print_function
-import os, glob
-import time
-import numpy as np
-import yaml
+
+import os
 import pickle
+import time
 from collections import OrderedDict
 
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
+import yaml
+from tensorboardX import SummaryWriter
 from torch.autograd import Variable
 from torch.utils.data import DataLoader
 
-from tensorboardX import SummaryWriter
-
-from utils import Parser, Timer
-from utils.nturgbd import gendata as ntu_gendata
-from utils.hdm05 import gendata as hdm_gendata
 import data
 import models
+from data.ntu_pyg import NTUDataset
+from utils import Parser, Timer
+
 
 class AverageMeter(object):
     """Computes and stores the average and current value"""
+
     def __init__(self):
         self.reset()
 
@@ -36,6 +37,7 @@ class AverageMeter(object):
         self.sum += val * n
         self.count += n
         self.avg = self.sum / self.count
+
 
 class Runner(object):
     """
@@ -78,14 +80,14 @@ class Runner(object):
             self.args.train_loader_args.update(extra_arg)
             self.train_dataset = getattr(data, self.args.loader)(**self.args.train_loader_args)
             self.train_loader = DataLoader(self.train_dataset,
-                batch_size=self.args.batch_size, shuffle=True,
-                num_workers=self.args.num_workers, pin_memory=True)
+                                           batch_size=self.args.batch_size, shuffle=True,
+                                           num_workers=self.args.num_workers, pin_memory=True)
             extra_arg = dict(random_state=st)
             self.args.test_loader_args.update(extra_arg)
             self.test_dataset = getattr(data, self.args.loader)(**self.args.test_loader_args)
             self.test_loader = DataLoader(self.test_dataset,
-                batch_size=self.args.batch_size, shuffle=False,
-                num_workers=self.args.num_workers, pin_memory=True)
+                                          batch_size=self.args.batch_size, shuffle=False,
+                                          num_workers=self.args.num_workers, pin_memory=True)
 
     def load_model(self):
         output_device = self.args.device[
@@ -146,7 +148,7 @@ class Runner(object):
     def adjust_learning_rate(self, epoch):
         if self.args.optimizer == 'SGD' or self.args.optimizer == 'Adam':
             lr = self.args.base_lr * (
-                0.1**np.sum(epoch >= np.array(self.args.step)))
+                    0.1 ** np.sum(epoch >= np.array(self.args.step)))
             for param_group in self.optimizer.param_groups:
                 param_group['lr'] = lr
             return lr
@@ -238,8 +240,7 @@ class Runner(object):
             model_path = '{}/epoch{}_model.pt'.format(self.args.work_dir,
                                                       epoch + 1)
             state_dict = self.model.state_dict()
-            weights = OrderedDict([[k.split('module.')[-1],
-                                    v.cpu()] for k, v in state_dict.items()])
+            weights = OrderedDict([[k.split('module.')[-1], v.cpu()] for k, v in state_dict.items()])
             torch.save(weights, model_path)
 
     def eval(self, epoch, save_score=False):
@@ -269,11 +270,11 @@ class Runner(object):
             self.summary_writer.add_scalar('Test/AvgLoss', np.mean(loss_value), epoch)
             for k in self.args.show_topk:
                 hit_val = self.top_k(score, self.test_dataset.labels, k)
-                self.summary_writer.add_scalar('Test/AvgTop'+str(k), hit_val, epoch)
+                self.summary_writer.add_scalar('Test/AvgTop' + str(k), hit_val, epoch)
                 self.print_log('\tTop{}: {:.2f}%'.format(
                     k, 100 * hit_val))
                 if k == 1:
-                    self.best_valid.append((np.mean(loss_value), 100*hit_val))
+                    self.best_valid.append((np.mean(loss_value), 100 * hit_val))
 
             if save_score:
                 with open('{}/epoch{}_{}_score.pkl'.format(
@@ -283,16 +284,16 @@ class Runner(object):
     def run(self):
         self.logdir = os.path.join(self.args.work_dir, 'runs')
         if not self.args.comment == '':
-            self.summary_writer = SummaryWriter(logdir=self.logdir, comment='_'+self.args.comment)
+            self.summary_writer = SummaryWriter(logdir=self.logdir, comment='_' + self.args.comment)
         else:
             self.summary_writer = SummaryWriter(logdir=self.logdir)
         if self.args.phase == 'train':
             self.print_log('Parameters:\n{}\n'.format(str(vars(self.args))))
             for epoch in range(self.args.start_epoch, self.args.num_epoch):
                 save_model = ((epoch + 1) % self.args.save_interval == 0) or (
-                    epoch + 1 == self.args.num_epoch)
+                        epoch + 1 == self.args.num_epoch)
                 eval_model = ((epoch + 1) % self.args.eval_interval == 0) or (
-                    epoch + 1 == self.args.num_epoch)
+                        epoch + 1 == self.args.num_epoch)
 
                 self.train(epoch, save_model=save_model)
 
@@ -312,6 +313,7 @@ class Runner(object):
             self.eval(
                 epoch=0, save_score=self.args.save_score)
             self.print_log('Done.\n')
+
 
 if __name__ == '__main__':
     p = Parser()
@@ -400,10 +402,10 @@ if __name__ == '__main__':
             )
     '''
 
-        # Launch the training process
-        launcher = Runner(args)
-        launcher.run()
-        best_valid_loss = sorted(self.best_valid, key=lambda x: x[0])
-        best_valid_acc = sorted(self.best_valid, key=lambda x: -x[1])
-        print("Lowest loss value (accuracy): {} ({})".format(best_valid_loss[0][0], best_valid_loss[0][1]))
-        print("Highest accuracy value (loss): {} ({})".format(best_valid_acc[0][1], best_valid_acc[0][0]))
+    # Launch the training process
+    launcher = Runner(args)
+    launcher.run()
+    best_valid_loss = sorted(best_valid, key=lambda x: x[0])
+    best_valid_acc = sorted(best_valid, key=lambda x: -x[1])
+    print("Lowest loss value (accuracy): {} ({})".format(best_valid_loss[0][0], best_valid_loss[0][1]))
+    print("Highest accuracy value (loss): {} ({})".format(best_valid_acc[0][1], best_valid_acc[0][0]))

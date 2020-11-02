@@ -19,11 +19,11 @@ import math
 import torch.nn as nn
 from functools import partial
 # from custom library
-from models.third_party.utils import default, gaussian_orthogonal_random_matrix, \
+from third_party.utils import default, gaussian_orthogonal_random_matrix, \
     causal_linear_attention, causal_linear_attention_noncuda, generalized_kernel, \
     softmax_kernel, exists, linear_attention, PreScaleNorm, ReZero, PreLayerNorm, \
     Chunk, FeedForward
-from models.third_party.reversible import ReversibleSequence, SequentialSequence
+from third_party.reversible import ReversibleSequence, SequentialSequence
 from einops import rearrange
 
 
