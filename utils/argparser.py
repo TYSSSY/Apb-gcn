@@ -1,6 +1,8 @@
 import argparse
 import os
+
 import yaml
+
 
 def str2bool(v):
     if v.lower() in ('yes', 'true', 't', 'y', '1'):
@@ -10,11 +12,12 @@ def str2bool(v):
     else:
         raise argparse.ArgumentTypeError('Boolean value expected.')
 
+
 class Parser(object):
     def __init__(self):
         self.desc = "Spatio Temporal Graph Convolutional Resnet Training/Testing"
         self.parser = argparse.ArgumentParser(
-                description=self.desc)
+            description=self.desc)
 
     def create_parser(self):
         self.parser.add_argument(
@@ -99,7 +102,7 @@ class Parser(object):
 
         # Model
         self.parser.add_argument('--model', default=None,
-            help='The model which will be used')
+                                 help='The model which will be used')
         self.parser.add_argument(
             '--model-args',
             type=dict,

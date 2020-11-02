@@ -13,6 +13,7 @@ from torch_sparse import spmm
 from torch_geometric.nn.conv import MessagePassing
 from torch_geometric.nn.inits import glorot, zeros
 from torch_geometric.utils import remove_self_loops, add_self_loops, softmax
+from einops import rearrange
 
 from utils.linalg import batched_spmm, batched_transpose, transpose_, masked_softmax, get_factorized_dim, to_band_sparse
 
@@ -94,7 +95,13 @@ class HGAConv(MessagePassing):
             a_r: Tensor           [num_nodes, heads]
         """
         if isinstance(adj, Tensor):
-            return a_l[adj[1], :] + a_r[adj[0], :]  # [num_edges, heads]
+            if len(a_l.shape) == 2:
+                return a_l[adj[1], :] + a_r[adj[0], :]  # [num_edges, heads]
+            else:
+                a_l_ = rearrange(a_l, 'b n c -> n (b c)')
+                a_r_ = rearrange(a_r, 'b n c -> n (b c)')
+                out = a_l_[adj[1], :] + a_r_[adj[0], :]
+                return rearrange(out, 'n (b c) -> b n c', c=a_l.shape[-1])
         a = []
         for i in range(len(adj)):
             a[i] = a_l[adj[i][1], i] + a_r[adj[i][0], i]
@@ -120,9 +127,13 @@ class HGAConv(MessagePassing):
             x_l, x_r = x, None
         else:
             x_l, x_r = x[0], x[1]
-        assert x_l.dim() == 2, 'Static graphs not supported in `HGAConv`.'
+        # assert x_l.dim() == 2, 'Static graphs not supported in `HGAConv`.'
         x_l = self.lin_l(x_l)
-        alpha_l = torch.mm(x_l, self.att_l)
+        if x_l.dim() == 2:
+            alpha_l = torch.mm(x_l, self.att_l)
+        else:  # x_l is 3D shape, matmul is in batched mode
+            alpha_l = torch.matmul(x_l, self.att_l)
+
         if x_r is not None:
             x_r = self.lin_r(x_r)
             alpha_r = torch.mm(x_r, self.att_r)
@@ -130,14 +141,18 @@ class HGAConv(MessagePassing):
             alpha_l_ = torch.mm(x_r, self.att_l)
             self.add_self_loops = False
         else:
-            alpha_r = torch.mm(x_l, self.att_r)
+            if x_l.dim() == 2:
+                alpha_r = torch.mm(x_l, self.att_r)
+            else:
+                alpha_r = torch.matmul(x_l, self.att_r)
+
         assert x_l is not None
         assert alpha_l is not None
 
         if self.add_self_loops:
-            num_nodes = x_l.size(0)
+            num_nodes = x_l.shape[-2]
             num_nodes = size[1] if size is not None else num_nodes
-            num_nodes = x_r.size(0) if x_r is not None else num_nodes
+            num_nodes = x_r.shape[-2] if x_r is not None else num_nodes
             if isinstance(adj, Tensor):
                 adj = self_loop_augment(num_nodes, adj)  # TODO Bug found
             else:
@@ -216,7 +231,7 @@ class HGAConv(MessagePassing):
         n, m = 0, 0
         if isinstance(x, Tensor):
             x_l = x
-            n = m = x_l.size(0)
+            n = m = x_l.shape[-2]
         else:
             x_l, x_r = x[0], x[1]
             (m, c2) = x_r.size()
