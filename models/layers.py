@@ -13,9 +13,10 @@ from torch_sparse import spmm
 from torch_geometric.nn.conv import MessagePassing
 from torch_geometric.nn.inits import glorot, zeros
 from torch_geometric.utils import remove_self_loops, add_self_loops, softmax
-from einops import rearrange
+from einops import rearrange, reduce
 
-from utility.linalg import batched_spmm, batched_transpose, transpose_, masked_softmax, get_factorized_dim, to_band_sparse
+from utility.linalg import batched_spmm, batched_transpose,\
+    transpose_, masked_softmax, get_factorized_dim, to_band_sparse
 
 
 def clones(module, k):
@@ -172,17 +173,23 @@ class HGAConv(MessagePassing):
         alpha = self._alpha
         self._alpha = None
 
-        if self.concat:  # TODO if 'out' is Tuple(Tensor, Tensor)
-            if isinstance(out, Tensor):
-                out = out.reshape(-1, self.heads * self.out_channels)
+        if isinstance(out, Tensor):  # reshape here is equivalent to concatenation
+            if len(x_l.shape) == 2:
+                out = rearrange(out, '(h n) c -> n (h c)', h=h)
             else:
-                out = (out[0].reshape(-1, self.heads * self.out_channels),
-                       out[1].reshape(-1, self.heads * self.out_channels))
+                out = rearrange(out, 't (h n) c -> t n (h c)', h=h)
         else:
+            out = (out[0].reshape(-1, h * c), out[1].reshape(-1, h * c))
+
+        if not self.concat:  # calculate mean
             if isinstance(out, Tensor):
-                out = out.mean(dim=1)
+                if len(x_l.shape) == 2:
+                    out = reduce(out, 'n (h c) -> n c', 'mean', h=h)
+                else:
+                    out = reduce(out, 't n (h c) -> t n c', 'mean', h=h)
             else:
                 out = (out[0].mean(dim=1), out[1].mean(dim=1))
+
         if self.bias is not None:
             if isinstance(out, Tensor):
                 out += self.bias
@@ -258,24 +265,18 @@ class HGAConv(MessagePassing):
 
         out_ = batched_spmm(alpha, adj, x_l, m, n)
         if x_r is None:
-            return out_.permute(1, 0, 2)
+            return out_
+            # return out_.permute(1, 0, 2)
         else:
             adj, alpha_ = batched_transpose(adj, alpha_)
             out_l = batched_spmm(alpha_, adj, x_r, n, m)
-            return out_l.permute(1, 0, 2), out_.permute(1, 0, 2)
+            return out_l, out_
+            # return out_l.permute(1, 0, 2), out_.permute(1, 0, 2)
 
     def __repr__(self):
         return '{}({}, {}, heads={})'.format(self.__class__.__name__,
                                              self.in_channels,
                                              self.out_channels, self.heads)
-
-
-class TemporalTransformer(nn.Module, ABC):
-    def __init__(self):
-        super(TemporalTransformer, self).__init__()
-
-    def forward(self, tensor):
-        return
 
 
 class DotProductAttention(nn.Module, ABC):
