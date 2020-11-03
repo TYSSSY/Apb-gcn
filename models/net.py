@@ -4,6 +4,7 @@ import torch.nn as nn
 import torch.nn.functional as fn
 from .layers import HGAConv
 from third_party.models import SelfAttention
+from einops import rearrange
 
 
 class DualGraphTransformer(nn.Module, ABC):
@@ -30,10 +31,13 @@ class DualGraphTransformer(nn.Module, ABC):
     def forward(self, t):
         if self.sequential:
             for i in range(len(self.num_layers)):
-                t = self.temporal_layers[i](
-                    fn.relu(self.spatial_layers[i](t)))
+                t = rearrange(fn.relu(self.spatial_layers[i](t)),
+                              'b n c -> n b c')
+                t = rearrange(self.temporal_layers[i](t),
+                              'n b c -> b n c')
         else:
             s = t
+            t_ = rearrange(t, 'b n c -> n b c')
             for i in range(len(self.num_layers)):
                 s = fn.relu(self.spatial_layers[i](s))
-                t = fn.relu(self.temporal_layers[i](t))
+                t_ = fn.relu(self.temporal_layers[i](t_))

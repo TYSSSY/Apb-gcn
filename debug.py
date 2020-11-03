@@ -2,6 +2,9 @@ import torch
 from data.dataset import SkeletonDataset
 from torch_geometric.data import DataLoader
 from models.layers import HGAConv
+from third_party.models import SelfAttention
+from einops import rearrange
+
 
 ds = SkeletonDataset(root='dataset',
                      name='ntu')
@@ -10,4 +13,10 @@ b = next(iter(loader))
 ly = HGAConv(in_channels=7,
              out_channels=16,
              heads=8)
-b = ly(b.x, adj=ds.skeleton_)
+t = ly(b.x, adj=ds.skeleton_)
+
+t = rearrange(t, 'b n c -> n b c')
+lt = SelfAttention(dim=10,
+                   nb_features=7)
+
+t = lt(t)

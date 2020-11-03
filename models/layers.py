@@ -278,133 +278,133 @@ class HGAConv(MessagePassing):
                                              self.in_channels,
                                              self.out_channels, self.heads)
 
-
-class DotProductAttention(nn.Module, ABC):
-    def __init__(self, dropout, **kwargs):
-        super(DotProductAttention, self).__init__(**kwargs)
-        self.dropout = nn.Dropout(dropout)
-
-    # `query`: (`batch_size`, #queries, `d`)
-    # `key`: (`batch_size`, #kv_pairs, `d`)
-    # `value`: (`batch_size`, #kv_pairs, `dim_v`)
-    # `valid_len`: either (`batch_size`, ) or (`batch_size`, xx)
-    def forward(self, query, key, value, valid_len=None):
-        d = query.shape[-1]
-        # Set transpose_b=True to swap the last two dimensions of key
-        scores = torch.bmm(query, key.transpose(1, 2)) / math.sqrt(d)
-        attention_weights = self.dropout(masked_softmax(scores, valid_len))
-        return torch.bmm(attention_weights, value)
-
-
-class MultiHeadAttention(nn.Module, ABC):
-    def __init__(self,
-                 key_size,
-                 query_size,
-                 value_size,
-                 num_hidden,
-                 num_heads,
-                 dropout,
-                 bias=False,
-                 **kwargs):
-        super(MultiHeadAttention, self).__init__(**kwargs)
-        self.num_heads = num_heads
-        self.attention = DotProductAttention(dropout)
-        self.wq = nn.Linear(query_size, num_hidden, bias=bias)
-        self.wk = nn.Linear(key_size, num_hidden, bias=bias)
-        self.wv = nn.Linear(value_size, num_hidden, bias=bias)
-        self.wo = nn.Linear(num_hidden, num_hidden, bias=bias)
-
-    def forward(self, query, key, value, valid_len):
-        # For self-attention, `query`, `key`, and `value` shape:
-        # (`batch_size`, `seq_len`, `dim`), where `seq_len` is the length of
-        # input sequence. `valid_len` shape is either (`batch_size`, ) or
-        # (`batch_size`, `seq_len`).
-
-        # Project and transpose `query`, `key`, and `value` from
-        # (`batch_size`, `seq_len`, `num_hidden`) to
-        # (`batch_size` * `num_heads`, `seq_len`, `num_hidden` / `num_heads`)
-        query = transpose_(self.wq(query), self.num_heads)
-        key = transpose_(self.wk(key), self.num_heads)
-        value = transpose_(self.wv(value), self.num_heads)
-
-        if valid_len is not None:
-            valid_len = torch.repeat_interleave(valid_len, repeats=self.num_heads, dim=0)
-
-        # For self-attention, `output` shape:
-        # (`batch_size` * `num_heads`, `seq_len`, `num_hidden` / `num_heads`)
-        output = self.attention(query, key, value, valid_len)
-
-        # `output_concat` shape: (`batch_size`, `seq_len`, `num_hidden`)
-        output_concat = transpose_(output, self.num_heads, reverse=True)
-        return self.wo(output_concat)
-
-
-class SynthesizedAttention(nn.Module, ABC):
-    def __init__(self, in_channels, dim_attention, out_channels,
-                 num_heads=3, num_layers=2,
-                 bias=True, banded=False, factorized=False,
-                 dropout=0.5):
-        """
-        Args:
-            bias: bool
-            banded: bool
-            factorized: bool
-            in_channels: int
-            dim_attention: int
-            out_channels: int
-            num_heads: int
-            num_layers: int
-        """
-        super(SynthesizedAttention, self).__init__()
-        self.banded = banded
-        self.dropout = dropout
-        self.num_heads = num_heads
-        self.factorized = factorized
-        self.dim_attention = dim_attention
-        self.synthesizers, self.synthesizers_ = None, None
-
-        dim_att = get_factorized_dim(dim_attention) if factorized else dim_attention
-        channels = [in_channels] * num_layers + [dim_att]
-        self.synthesizers = nn.ModuleList([
-            nn.Linear(in_features=channels[i],
-                      out_features=channels[i + 1],
-                      bias=bias) for i in range(num_layers)
-        ])
-        channels = [in_channels] * num_layers + [int(dim_attention / dim_att)]
-        self.synthesizers_ = nn.ModuleList([
-            nn.Linear(in_features=channels[i],
-                      out_features=channels[i + 1],
-                      bias=bias) for i in range(num_layers)
-        ]) if self.factorized else None
-        self.wv = nn.Linear(in_features=in_channels,
-                            out_features=out_channels,
-                            bias=bias)
-
-    def forward(self, x):
-        m, _ = x.shape[-2:]
-        v = fn.relu(self.wv(x))
-        y = x if self.factorized else None
-        for i in range(len(self.synthesizers)):
-            x = fn.relu(self.synthesizers[i](x))
-            if self.factorized:
-                y = fn.relu(self.synthesizers_[i](y))
-        if self.factorized:
-            l_s, r_s = x.shape[-1], y.shape[-1]
-            x = x.repeat(1, 1, r_s)
-            y = y.repeat(1, 1, l_s)
-            x = x * y
-        if self.banded:
-            indices, values = to_band_sparse(x)
-            values = softmax(values, index=indices)
-            return spmm(indices, values, m, m, v)
-        return torch.bmm(fn.softmax(x, dim=-1), v)
-
-
-class AddNorm(nn.Module, ABC):
-    def __init__(self, normalized_shape, dropout, **kwargs):
-        super(AddNorm, self).__init__(**kwargs)
-        self.dropout = nn.Dropout(dropout)
-        self.ln = nn.LayerNorm(normalized_shape)
-
-    def forward(self, x, y):
-        return self.ln(self.dropout(y) + x)
+#
+# class DotProductAttention(nn.Module, ABC):
+#     def __init__(self, dropout, **kwargs):
+#         super(DotProductAttention, self).__init__(**kwargs)
+#         self.dropout = nn.Dropout(dropout)
+#
+#     # `query`: (`batch_size`, #queries, `d`)
+#     # `key`: (`batch_size`, #kv_pairs, `d`)
+#     # `value`: (`batch_size`, #kv_pairs, `dim_v`)
+#     # `valid_len`: either (`batch_size`, ) or (`batch_size`, xx)
+#     def forward(self, query, key, value, valid_len=None):
+#         d = query.shape[-1]
+#         # Set transpose_b=True to swap the last two dimensions of key
+#         scores = torch.bmm(query, key.transpose(1, 2)) / math.sqrt(d)
+#         attention_weights = self.dropout(masked_softmax(scores, valid_len))
+#         return torch.bmm(attention_weights, value)
+#
+#
+# class MultiHeadAttention(nn.Module, ABC):
+#     def __init__(self,
+#                  key_size,
+#                  query_size,
+#                  value_size,
+#                  num_hidden,
+#                  num_heads,
+#                  dropout,
+#                  bias=False,
+#                  **kwargs):
+#         super(MultiHeadAttention, self).__init__(**kwargs)
+#         self.num_heads = num_heads
+#         self.attention = DotProductAttention(dropout)
+#         self.wq = nn.Linear(query_size, num_hidden, bias=bias)
+#         self.wk = nn.Linear(key_size, num_hidden, bias=bias)
+#         self.wv = nn.Linear(value_size, num_hidden, bias=bias)
+#         self.wo = nn.Linear(num_hidden, num_hidden, bias=bias)
+#
+#     def forward(self, query, key, value, valid_len):
+#         # For self-attention, `query`, `key`, and `value` shape:
+#         # (`batch_size`, `seq_len`, `dim`), where `seq_len` is the length of
+#         # input sequence. `valid_len` shape is either (`batch_size`, ) or
+#         # (`batch_size`, `seq_len`).
+#
+#         # Project and transpose `query`, `key`, and `value` from
+#         # (`batch_size`, `seq_len`, `num_hidden`) to
+#         # (`batch_size` * `num_heads`, `seq_len`, `num_hidden` / `num_heads`)
+#         query = transpose_(self.wq(query), self.num_heads)
+#         key = transpose_(self.wk(key), self.num_heads)
+#         value = transpose_(self.wv(value), self.num_heads)
+#
+#         if valid_len is not None:
+#             valid_len = torch.repeat_interleave(valid_len, repeats=self.num_heads, dim=0)
+#
+#         # For self-attention, `output` shape:
+#         # (`batch_size` * `num_heads`, `seq_len`, `num_hidden` / `num_heads`)
+#         output = self.attention(query, key, value, valid_len)
+#
+#         # `output_concat` shape: (`batch_size`, `seq_len`, `num_hidden`)
+#         output_concat = transpose_(output, self.num_heads, reverse=True)
+#         return self.wo(output_concat)
+#
+#
+# class SynthesizedAttention(nn.Module, ABC):
+#     def __init__(self, in_channels, dim_attention, out_channels,
+#                  num_heads=3, num_layers=2,
+#                  bias=True, banded=False, factorized=False,
+#                  dropout=0.5):
+#         """
+#         Args:
+#             bias: bool
+#             banded: bool
+#             factorized: bool
+#             in_channels: int
+#             dim_attention: int
+#             out_channels: int
+#             num_heads: int
+#             num_layers: int
+#         """
+#         super(SynthesizedAttention, self).__init__()
+#         self.banded = banded
+#         self.dropout = dropout
+#         self.num_heads = num_heads
+#         self.factorized = factorized
+#         self.dim_attention = dim_attention
+#         self.synthesizers, self.synthesizers_ = None, None
+#
+#         dim_att = get_factorized_dim(dim_attention) if factorized else dim_attention
+#         channels = [in_channels] * num_layers + [dim_att]
+#         self.synthesizers = nn.ModuleList([
+#             nn.Linear(in_features=channels[i],
+#                       out_features=channels[i + 1],
+#                       bias=bias) for i in range(num_layers)
+#         ])
+#         channels = [in_channels] * num_layers + [int(dim_attention / dim_att)]
+#         self.synthesizers_ = nn.ModuleList([
+#             nn.Linear(in_features=channels[i],
+#                       out_features=channels[i + 1],
+#                       bias=bias) for i in range(num_layers)
+#         ]) if self.factorized else None
+#         self.wv = nn.Linear(in_features=in_channels,
+#                             out_features=out_channels,
+#                             bias=bias)
+#
+#     def forward(self, x):
+#         m, _ = x.shape[-2:]
+#         v = fn.relu(self.wv(x))
+#         y = x if self.factorized else None
+#         for i in range(len(self.synthesizers)):
+#             x = fn.relu(self.synthesizers[i](x))
+#             if self.factorized:
+#                 y = fn.relu(self.synthesizers_[i](y))
+#         if self.factorized:
+#             l_s, r_s = x.shape[-1], y.shape[-1]
+#             x = x.repeat(1, 1, r_s)
+#             y = y.repeat(1, 1, l_s)
+#             x = x * y
+#         if self.banded:
+#             indices, values = to_band_sparse(x)
+#             values = softmax(values, index=indices)
+#             return spmm(indices, values, m, m, v)
+#         return torch.bmm(fn.softmax(x, dim=-1), v)
+#
+#
+# class AddNorm(nn.Module, ABC):
+#     def __init__(self, normalized_shape, dropout, **kwargs):
+#         super(AddNorm, self).__init__(**kwargs)
+#         self.dropout = nn.Dropout(dropout)
+#         self.ln = nn.LayerNorm(normalized_shape)
+#
+#     def forward(self, x, y):
+#         return self.ln(self.dropout(y) + x)
