@@ -1,7 +1,7 @@
 from __future__ import with_statement
 
 import torch
-from .utility.linalg import power_adj
+from utility.linalg import power_adj
 
 
 def skeleton_parts(num_joints=25):
