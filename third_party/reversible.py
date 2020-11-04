@@ -1,5 +1,3 @@
-from abc import ABC
-
 import torch
 import torch.nn as nn
 from torch.autograd.function import Function
@@ -19,8 +17,9 @@ def route_args(router, args, depth):
     return routed_args
 
 
-# following example for saving and setting rng here https://pytorch.org/docs/stable/_modules/torch/utils/checkpoint.html
-class Deterministic(nn.Module, ABC):
+# following example for saving and setting rng here
+# https://pytorch.org/docs/stable/_modules/torch/utils/checkpoint.html
+class Deterministic(nn.Module):
     def __init__(self, net):
         super().__init__()
         self.net = net
@@ -53,19 +52,16 @@ class Deterministic(nn.Module, ABC):
             return self.net(*args, **kwargs)
 
 
-# heavily inspired by https://github.com/RobinBruegger/RevTorch/blob/master/revtorch/revtorch.py
+# heavily inspired by
+# https://github.com/RobinBruegger/RevTorch/blob/master/revtorch/revtorch.py
 # once multi-GPU is confirmed working, refactor and send PR back to source
-class ReversibleBlock(nn.Module, ABC):
+class ReversibleBlock(nn.Module):
     def __init__(self, f, g):
         super().__init__()
         self.f = Deterministic(f)
         self.g = Deterministic(g)
 
-    def forward(self, x, f_args=None, g_args=None):
-        if g_args is None:
-            g_args = {}
-        if f_args is None:
-            f_args = {}
+    def forward(self, x, f_args={}, g_args={}):
         x1, x2 = torch.chunk(x, 2, dim=2)
         y1, y2 = None, None
 
@@ -75,11 +71,7 @@ class ReversibleBlock(nn.Module, ABC):
 
         return torch.cat([y1, y2], dim=2)
 
-    def backward_pass(self, y, dy, f_args=None, g_args=None):
-        if g_args is None:
-            g_args = {}
-        if f_args is None:
-            f_args = {}
+    def backward_pass(self, y, dy, f_args={}, g_args={}):
         y1, y2 = torch.chunk(y, 2, dim=2)
         del y
 
@@ -138,10 +130,8 @@ class _ReversibleFunction(Function):
 
 
 class SequentialSequence(nn.Module):
-    def __init__(self, layers, args_route=None, layer_dropout=0.):
+    def __init__(self, layers, args_route={}, layer_dropout=0.):
         super().__init__()
-        if args_route is None:
-            args_route = {}
         assert all(len(route) == len(layers) for route in
                    args_route.values()), 'each argument route map must have the same depth as the number of sequential layers'
         self.layers = layers
@@ -161,11 +151,9 @@ class SequentialSequence(nn.Module):
         return x
 
 
-class ReversibleSequence(nn.Module, ABC):
-    def __init__(self, blocks, args_route=None):
+class ReversibleSequence(nn.Module):
+    def __init__(self, blocks, args_route={}):
         super().__init__()
-        if args_route is None:
-            args_route = {}
         self.args_route = args_route
         self.blocks = nn.ModuleList([ReversibleBlock(f=f, g=g) for f, g in blocks])
 

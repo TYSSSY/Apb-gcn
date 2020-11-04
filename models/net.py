@@ -3,7 +3,7 @@ from abc import ABC
 import torch.nn as nn
 import torch.nn.functional as fn
 from .layers import HGAConv
-from third_party.models import SelfAttention
+from third_party.performer import SelfAttention
 from einops import rearrange
 
 
