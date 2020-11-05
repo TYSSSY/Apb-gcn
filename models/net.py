@@ -53,4 +53,4 @@ class DualGraphTransformer(nn.Module, ABC):
                 t = self.spatial_factor * s + (1. - self.spatial_factor) * rearrange(t, 'n b c -> b n c')
             else:
                 t = (s + rearrange(t, 'n b c -> b n c')) * 0.5
-        return self.bottle_neck(t)
+        return self.bottle_neck(t)  # dimension (b, n, oc)

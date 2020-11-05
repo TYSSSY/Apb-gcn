@@ -23,3 +23,4 @@ lt = SelfAttention(dim=c,
                    causal=True)
 
 t = lt(t)
+print(t.shape)
