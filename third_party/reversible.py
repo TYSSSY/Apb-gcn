@@ -17,7 +17,7 @@ def route_args(router, args, depth):
     return routed_args
 
 
-# following example for saving and setting rng here
+# following example for saving and setting rng here:
 # https://pytorch.org/docs/stable/_modules/torch/utils/checkpoint.html
 class Deterministic(nn.Module):
     def __init__(self, net):
@@ -61,7 +61,11 @@ class ReversibleBlock(nn.Module):
         self.f = Deterministic(f)
         self.g = Deterministic(g)
 
-    def forward(self, x, f_args={}, g_args={}):
+    def forward(self, x, f_args=None, g_args=None):
+        if g_args is None:
+            g_args = {}
+        if f_args is None:
+            f_args = {}
         x1, x2 = torch.chunk(x, 2, dim=2)
         y1, y2 = None, None
 
@@ -71,7 +75,11 @@ class ReversibleBlock(nn.Module):
 
         return torch.cat([y1, y2], dim=2)
 
-    def backward_pass(self, y, dy, f_args={}, g_args={}):
+    def backward_pass(self, y, dy, f_args=None, g_args=None):
+        if g_args is None:
+            g_args = {}
+        if f_args is None:
+            f_args = {}
         y1, y2 = torch.chunk(y, 2, dim=2)
         del y
 
@@ -130,21 +138,19 @@ class _ReversibleFunction(Function):
 
 
 class SequentialSequence(nn.Module):
-    def __init__(self, layers, args_route={}, layer_dropout=0.):
+    def __init__(self, layers, args_route=None):
         super().__init__()
+        if args_route is None:
+            args_route = {}
         assert all(len(route) == len(layers) for route in
-                   args_route.values()), 'each argument route map must have the same depth ' \
-                                         'as the number of sequential layers'
+                   args_route.values()), 'each argument route map must have the same depth as ' \
+                                         'the number of sequential layers'
         self.layers = layers
         self.args_route = args_route
-        self.layer_dropout = layer_dropout
 
     def forward(self, x, **kwargs):
         args = route_args(self.args_route, kwargs, len(self.layers))
         layers_and_args = list(zip(self.layers, args))
-
-        if self.training and self.layer_dropout > 0:
-            layers_and_args = layer_drop(layers_and_args, self.layer_dropout)
 
         for (f, g), (f_args, g_args) in layers_and_args:
             x = x + f(x, **f_args)
@@ -153,8 +159,10 @@ class SequentialSequence(nn.Module):
 
 
 class ReversibleSequence(nn.Module):
-    def __init__(self, blocks, args_route={}):
+    def __init__(self, blocks, args_route=None):
         super().__init__()
+        if args_route is None:
+            args_route = {}
         self.args_route = args_route
         self.blocks = nn.ModuleList([ReversibleBlock(f=f, g=g) for f, g in blocks])
 

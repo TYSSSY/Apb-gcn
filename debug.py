@@ -16,8 +16,10 @@ ly = HGAConv(in_channels=7,
 t = ly(b.x, adj=ds.skeleton_)
 
 t = rearrange(t, 'b n c -> n b c')
-lt = SelfAttention(dim=128,
-                   nb_features=7,
+h = 4  # num_heads
+b, n, c = t.shape
+lt = SelfAttention(dim=c,
+                   heads=h,
                    causal=True)
 
 t = lt(t)

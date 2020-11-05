@@ -2,8 +2,8 @@ import math
 from functools import partial
 
 import torch
-from einops import rearrange
-from local_attention import LocalAttention
+from einops import rearrange, repeat
+from .local_attention import LocalAttention
 from .reversible import ReversibleSequence, SequentialSequence
 from torch import nn
 
@@ -40,17 +40,15 @@ def find_modules(nn_module, type):
 # https://github.com/google-research/google-research/blob/master/performer/fast_self_attention/fast_self_attention.py
 
 def softmax_kernel(data, *, projection_matrix, is_query, normalize_data=True, eps=1e-4, device=None):
-    if normalize_data:
-        data_normalizer = 1.0 / (data.shape[-1] ** 0.25)
-    else:
-        data_normalizer = 1.0
+    b, h, *_ = data.shape
 
-    ratio = 1.0 / (projection_matrix.shape[0] ** 0.5)
+    data_normalizer = (data.shape[-1] ** -0.25) if normalize_data else 1.
 
-    data_mod_shape = data.shape[:(len(data.shape) - 2)] + projection_matrix.shape
-    data_thick_random_matrix = torch.zeros(data_mod_shape, device=device) + projection_matrix
+    ratio = (projection_matrix.shape[0] ** -0.5)
 
-    data_dash = torch.einsum('...id,...jd->...ij', (data_normalizer * data), data_thick_random_matrix)
+    projection = repeat(projection_matrix, 'j d -> b h j d', b=b, h=h)
+
+    data_dash = torch.einsum('...id,...jd->...ij', (data_normalizer * data), projection)
 
     diag_data = data ** 2
     diag_data = torch.sum(diag_data, dim=-1)
@@ -70,18 +68,16 @@ def softmax_kernel(data, *, projection_matrix, is_query, normalize_data=True, ep
 
 def generalized_kernel(data, *, projection_matrix, kernel_fn=nn.ReLU(), kernel_epsilon=0.001, normalize_data=True,
                        device=None):
-    if normalize_data:
-        data_normalizer = 1.0 / (data.shape[-1] ** 0.25)
-    else:
-        data_normalizer = 1.0
+    b, h, *_ = data.shape
+
+    data_normalizer = (data.shape[-1] ** -0.25) if normalize_data else 1.
 
     if projection_matrix is None:
         return kernel_fn(data_normalizer * data) + kernel_epsilon
 
-    data_mod_shape = data.shape[0:len(data.shape) - 2] + projection_matrix.shape
-    data_thick_random_matrix = torch.zeros(data_mod_shape, device=device) + projection_matrix
+    projection = repeat(projection_matrix, 'j d -> b h j d', b=b, h=h)
 
-    data_dash = torch.einsum('...id,...jd->...ij', (data_normalizer * data), data_thick_random_matrix)
+    data_dash = torch.einsum('...id,...jd->...ij', (data_normalizer * data), projection)
 
     data_prime = kernel_fn(data_dash) + kernel_epsilon
     return data_prime
@@ -179,8 +175,8 @@ class FastAttention(nn.Module):
                 import fast_transformers.causal_product.causal_product_cuda
                 self.causal_linear_fn = causal_linear_attention
             except ImportError:
-                print('unable to import cuda code for auto-regressive Performer. '
-                      'will default to the memory inefficient non-cuda version')
+                print(
+                    'unable to import cuda code for auto-regressive Performer. will default to the memory inefficient non-cuda version')
                 self.causal_linear_fn = causal_linear_attention_noncuda
 
     def set_projection_matrix(self, device):
@@ -210,6 +206,7 @@ class FastAttention(nn.Module):
 
 
 # classes
+
 class ReZero(nn.Module):
     def __init__(self, fn):
         super().__init__()
@@ -338,11 +335,10 @@ class Performer(nn.Module):
         layers = nn.ModuleList([])
         local_attn_heads = cast_tuple(local_attn_heads)
         local_attn_heads = local_attn_heads * depth if len(local_attn_heads) == 1 else local_attn_heads
-        assert len(
-            local_attn_heads) == depth, 'tuple specifying number of local attention heads per depth ' \
-                                        'must be equal to the total depth'
-        assert all(map(lambda n: 0 < n <= heads,
-                       local_attn_heads)), 'local attention head value must be less than the total number of heads'
+        assert len(local_attn_heads) == depth, \
+            'tuple specifying number of local attention heads per depth must be equal to the total depth'
+        assert all(map(lambda n: 0 <= n <= heads, local_attn_heads)), \
+            'local attention head value must be less than the total number of heads'
 
         if use_scalenorm:
             wrapper_fn = partial(PreScaleNorm, dim)
@@ -374,7 +370,7 @@ class PerformerLM(nn.Module):
     def __init__(self, *, num_tokens, max_seq_len, dim, depth, heads, local_attn_heads=0, local_window_size=256,
                  causal=False, ff_mult=4, nb_features=None, reversible=False, ff_chunks=1, ff_glu=False, emb_dropout=0.,
                  ff_dropout=0., attn_dropout=0., generalized_attention=False, kernel_fn=nn.ReLU(), qr_uniform_q=False,
-                 use_scalenorm=False, use_rezero=False, tie_embedding=False):
+                 use_scalenorm=False, use_rezero=False):
         super().__init__()
         local_attn_heads = cast_tuple(local_attn_heads)
 
@@ -390,11 +386,6 @@ class PerformerLM(nn.Module):
                                    reversible, ff_chunks, generalized_attention, kernel_fn, qr_uniform_q, use_scalenorm,
                                    use_rezero, ff_glu, ff_dropout, attn_dropout)
         self.norm = nn.LayerNorm(dim)
-
-        if tie_embedding:
-            self.to_logits = lambda t: t @ self.token_emb.weight.t()
-        else:
-            self.to_logits = nn.Linear(dim, num_tokens)
 
     def fix_projection_matrices_(self):
         fast_attentions = find_modules(self, FastAttention)
@@ -414,4 +405,4 @@ class PerformerLM(nn.Module):
 
         # norm and to logits
         x = self.norm(x)
-        return self.to_logits(x)
+        return x @ self.token_emb.weight.t()
