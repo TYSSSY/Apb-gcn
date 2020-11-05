@@ -20,8 +20,10 @@ class SkeletonDataset(Dataset, ABC):
         self.name = name
         if 'ntu' in name:
             self.num_joints = 25
-        else:
+        elif 'hdm' in name:
             self.num_joints = 31
+        else:
+            raise ValueError(self.name + " not supported")
 
         self.skeleton_ = skeleton_parts()
         self.use_motion_vector = use_motion_vector
@@ -34,7 +36,8 @@ class SkeletonDataset(Dataset, ABC):
 
     @property
     def raw_file_names(self):
-        return [osp.join(self.root, 'raw', f) for f in os.listdir(self.raw_dir)]
+        fp = lambda x: osp.join(self.root, 'raw', x)
+        return [fp(f) for f in os.listdir(self.raw_dir)]  # if osp.isfile(fp(f))]
 
     @property
     def processed_file_names(self):
@@ -61,7 +64,7 @@ class SkeletonDataset(Dataset, ABC):
 
             if self.pre_transform is not None:
                 data = self.pre_transform(data)
-            # data = Data(x=data, edge_index=self.skeleton_)
+            data = Data(x=data)  # , edge_index=self.skeleton_)
             skeletons.append(data)
             labels[i] = label
             i += 1
@@ -78,8 +81,12 @@ class SkeletonDataset(Dataset, ABC):
 
 
 def test():
-    ds = SkeletonDataset(root='dataset',
+    from torch_geometric.data import DataLoader
+    ds = SkeletonDataset(root='../dataset',
                          name='ntu')
+    loader = DataLoader(ds, batch_size=4)
+    for b in loader:
+        print(b.batch)
 
 
 if __name__ == "__main__":
