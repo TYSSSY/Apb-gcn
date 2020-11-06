@@ -30,9 +30,10 @@ class DualGraphTransformer(nn.Module, ABC):
                     heads=num_heads,
                     out_channels=channels[i + 1]) for i in range(num_layers)
         ])
+        channels_ = channels[1:] + [out_channels] if sequential else channels
         self.temporal_layers = nn.ModuleList([
             # necessary parameters are: dim
-            SelfAttention(dim=channels[i],  # TODO ??? potential dimension problem
+            SelfAttention(dim=channels_[i],  # TODO ??? potential dimension problem
                           heads=num_heads,
                           causal=True) for i in range(num_layers)
         ])
@@ -40,9 +41,9 @@ class DualGraphTransformer(nn.Module, ABC):
                                      out_features=out_channels)
         self.final_layer = nn.Linear(in_features=out_channels * num_joints, out_features=classes)
 
-    def forward(self, t, adj):
+    def forward(self, t, adj):  # adj=dataset.skeleton_
         if self.sequential:  # sequential architecture
-            for i in range(len(self.num_layers)):  # adj=ds.skeleton_
+            for i in range(self.num_layers):
                 t = rearrange(fn.relu(self.spatial_layers[i](t, adj)),
                               'b n c -> n b c')
                 t = rearrange(fn.relu(self.temporal_layers[i](t)),
@@ -50,7 +51,7 @@ class DualGraphTransformer(nn.Module, ABC):
         else:  # parallel architecture
             s = t
             t_ = rearrange(t, 'b n c -> n b c')
-            for i in range(len(self.num_layers)):
+            for i in range(self.num_layers):
                 s = fn.relu(self.spatial_layers[i](s, adj))
                 t_ = fn.relu(self.temporal_layers[i](t_))
             if self.trainable_factor:
