@@ -15,6 +15,8 @@ class DualGraphTransformer(nn.Module, ABC):
                  out_channels,
                  num_layers,
                  num_heads=8,
+                 num_joints=25,
+                 classes=60,
                  sequential=True,
                  trainable_factor=True):
         super(DualGraphTransformer, self).__init__()
@@ -35,6 +37,7 @@ class DualGraphTransformer(nn.Module, ABC):
         ])
         self.bottle_neck = nn.Linear(in_features=out_channels,
                                      out_features=out_channels)
+        self.final_layer = nn.Linear(in_features=out_channels * num_joints, out_features=classes)
 
     def forward(self, t):
         if self.sequential:  # sequential architecture
@@ -50,7 +53,11 @@ class DualGraphTransformer(nn.Module, ABC):
                 s = fn.relu(self.spatial_layers[i](s))
                 t_ = fn.relu(self.temporal_layers[i](t_))
             if self.trainable_factor:
-                t = self.spatial_factor * s + (1. - self.spatial_factor) * rearrange(t, 'n b c -> b n c')
+                factor = fn.sigmoid(self.spatial_factor)
+                t = factor * s + (1. - factor) * rearrange(t, 'n b c -> b n c')
             else:
                 t = (s + rearrange(t, 'n b c -> b n c')) * 0.5
-        return self.bottle_neck(t)  # dimension (b, n, oc)
+        t = rearrange(self.bottle_neck(t), 'b n c -> b (n c)')
+        t = self.final_layer(t)
+
+        return t  # dimension (b, n, oc)
