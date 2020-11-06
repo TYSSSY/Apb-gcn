@@ -22,6 +22,7 @@ class DualGraphTransformer(nn.Module, ABC):
         super(DualGraphTransformer, self).__init__()
         self.spatial_factor = nn.Parameter(torch.ones(1)) * 0.5
         self.sequential = sequential
+        self.num_layers = num_layers
         self.trainable_factor = trainable_factor
         channels = [in_channels] + [hidden_channels] * (num_layers - 1) + [out_channels]
         self.spatial_layers = nn.ModuleList([
@@ -39,10 +40,10 @@ class DualGraphTransformer(nn.Module, ABC):
                                      out_features=out_channels)
         self.final_layer = nn.Linear(in_features=out_channels * num_joints, out_features=classes)
 
-    def forward(self, t):
+    def forward(self, t, adj):
         if self.sequential:  # sequential architecture
-            for i in range(len(self.num_layers)):
-                t = rearrange(fn.relu(self.spatial_layers[i](t)),
+            for i in range(len(self.num_layers)):  # adj=ds.skeleton_
+                t = rearrange(fn.relu(self.spatial_layers[i](t, adj)),
                               'b n c -> n b c')
                 t = rearrange(fn.relu(self.temporal_layers[i](t)),
                               'n b c -> b n c')
@@ -50,7 +51,7 @@ class DualGraphTransformer(nn.Module, ABC):
             s = t
             t_ = rearrange(t, 'b n c -> n b c')
             for i in range(len(self.num_layers)):
-                s = fn.relu(self.spatial_layers[i](s))
+                s = fn.relu(self.spatial_layers[i](s, adj))
                 t_ = fn.relu(self.temporal_layers[i](t_))
             if self.trainable_factor:
                 factor = fn.sigmoid(self.spatial_factor)
